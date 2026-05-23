@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: smart-doc-sorter
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# Application Storage Boundaries
+app:
+  storage:
+    # "${user.dir}" is a built-in Java variable that dynamically points
+    # to your current project's folder location.
+    staging-dir: ${user.dir}/storage/staging
+    target-dir: ${user.dir}/storage/target
