@@ -86,4 +86,29 @@ public class FileOrganizerService {
             Files.move(file, pending.resolve(file.getFileName()));
         } catch (Exception e) { e.printStackTrace(); }
     }
+
+    public Map<String, Object> getFileTree() throws IOException {
+        return buildNode(targetPath);
+    }
+
+    private Map<String, Object> buildNode(Path path) throws IOException {
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("name", path.getFileName().toString());
+        node.put("isDirectory", Files.isDirectory(path));
+
+        if (Files.isDirectory(path)) {
+            try (var children = Files.list(path)) {
+                List<Map<String, Object>> childNodes = children
+                        .filter(p -> !p.getFileName().toString().equals("PENDING"))
+                        .map(p -> {
+                            try { return buildNode(p); }
+                            catch (IOException e) { return null; }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                node.put("children", childNodes);
+            }
+        }
+        return node;
+    }
 }
