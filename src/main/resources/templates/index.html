@@ -13,10 +13,21 @@
 <div class="dashboard-container">
     <div id="pendingPane" class="pane">
         <h2>Pending Files</h2>
-        <div id="dropZone" class="box">
+
+        <div id="dropZone" class="box" style="border: 2px dashed #cbd5e1; padding: 20px; text-align: center; cursor: pointer;">
             <p>Drag & Drop here or click to upload</p>
-            <input type="file" id="fileInput" style="display:none;" />
+            <input type="file" id="fileInput" multiple style="display:none;" />
         </div>
+
+        <div id="stagingArea" style="margin-top: 20px;">
+            <h3>Staged for Upload</h3>
+            <ul id="stagingList"></ul>
+            <div style="display:flex; gap: 10px;">
+                <button id="uploadAllBtn" style="display:none;">Upload All Staged Files</button>
+                <button id="clearStagedBtn" style="display:none; background-color: #ef4444; color: white;">Clear Staged Files</button>
+            </div>
+        </div>
+
         <div id="fileList"></div>
     </div>
 

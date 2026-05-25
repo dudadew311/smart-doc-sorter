@@ -1,9 +1,9 @@
 package com.personal.docsorter.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import java.util.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class AISuggestionService {
@@ -11,24 +11,22 @@ public class AISuggestionService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String OLLAMA_URL = "http://localhost:11434/api/generate";
 
-    // Changed return type to List<String> to match your goal
-    public List<String> getSuggestion(String fileContent, String currentTree) {
+    public Map<String, Object> getSuggestion(String fileContent, String currentTree) {
         try {
-            String prompt = "You are a professional filing assistant. Current folder structure: " + currentTree +
-                    ". Analyze the following file content and suggest 3 distinct, complete FOLDER PATHS only." +
-                    " DO NOT include any filenames in your response. " +
-                    "Return ONLY a JSON list of strings, e.g. [\"Work/Projects\", \"Finance/Taxes\"]." +
+            String prompt = "You are a professional filing assistant. Current structure: " + currentTree +
+                    ". Analyze the content and suggest a folder path. " +
+                    "Return ONLY a JSON object: {\"path\": \"Folder/Sub\", \"confidence\": 0.95, \"alternatives\": [\"Alt1\", \"Alt2\"]}. " +
                     "Content: " + fileContent;
 
             Map<String, Object> request = Map.of("model", "llama3", "prompt", prompt, "stream", false);
             Map response = restTemplate.postForObject(OLLAMA_URL, request, Map.class);
             String aiString = (String) response.get("response");
 
-            int start = aiString.indexOf("[");
-            int end = aiString.lastIndexOf("]");
-            return objectMapper.readValue(aiString.substring(start, end + 1), List.class);
+            int start = aiString.indexOf("{");
+            int end = aiString.lastIndexOf("}");
+            return objectMapper.readValue(aiString.substring(start, end + 1), Map.class);
         } catch (Exception e) {
-            return List.of("UNCATEGORIZED");
+            return Map.of("path", "UNCATEGORIZED", "confidence", 0.0, "alternatives", List.of());
         }
     }
 }
