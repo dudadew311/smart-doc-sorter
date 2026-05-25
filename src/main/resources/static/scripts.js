@@ -33,13 +33,24 @@ async function refreshDashboard() {
     fetch('/api/v1/documents/pending')
         .then(res => res.json())
         .then(files => {
-            const listContainer = document.getElementById('fileList');
-            listContainer.innerHTML = files.map(f => `
-                <div class="pending-item">
-                    <span>${f}</span>
-                    <button onclick="categorizeFile('${f}', 'ACADEMIC', 'PAPERS')">Sort to Academic</button>
+            const container = document.getElementById('pendingPane');
+            // We preserve the Drop Zone and list container structure
+            container.innerHTML = `
+                <h2>Pending</h2>
+                <div id="dropZone" class="box">
+                    <p>Drag & Drop files here or click to upload</p>
+                    <input type="file" id="fileInput" style="display:none;" />
                 </div>
-            `).join('');
+                <div id="fileList">
+                    ${files.map(f => `
+                        <div class="file-item" onclick="loadSuggestion('${f}')" style="cursor:pointer; padding: 5px; border-bottom: 1px solid #eee;">
+                            ${f}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            // Attach upload logic ONLY after the elements exist
+            setupUploadListeners();
         });
 
     // 2. Load Explorer Tree (Right Pane)
@@ -52,40 +63,26 @@ async function refreshDashboard() {
         });
 }
 
-// Initial load on page start
-document.addEventListener('DOMContentLoaded', refreshDashboard);
+function setupUploadListeners() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
 
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
-// Click to upload
-dropZone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-// Drag and drop handlers
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-});
-
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-
-dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    handleFiles(e.dataTransfer.files);
-});
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+}
 
 async function handleFiles(files) {
     const formData = new FormData();
     formData.append('file', files[0]);
-
-    await fetch('/api/v1/documents/upload', {
-        method: 'POST',
-        body: formData
-    });
-
-    // Refresh the dashboard after upload
+    await fetch('/api/v1/documents/upload', { method: 'POST', body: formData });
     refreshDashboard();
 }
 
@@ -95,11 +92,41 @@ async function categorizeFile(fileName, category, subfolder) {
     formData.append('category', category);
     formData.append('subfolder', subfolder);
 
-    await fetch('/api/v1/documents/categorize', {
-        method: 'POST',
-        body: formData
-    });
-
-    // Refresh to update both the Pending list and the Explorer tree
+    await fetch('/api/v1/documents/categorize', { method: 'POST', body: formData });
     refreshDashboard();
 }
+
+async function loadSuggestion(fileName) {
+    const pane = document.getElementById('suggestionsPane');
+
+    // 1. Give immediate feedback
+    pane.innerHTML = '<h2>Suggestions for ' + fileName + '</h2><p class="loading-text"><i>AI is thinking...</i></p>';
+
+    try {
+        console.log("Requesting suggestion for:", fileName);
+        const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName.trim())}`);
+
+        if (!res.ok) {
+            pane.innerHTML = `<p style="color:red;">Error fetching suggestions.</p>`;
+            return;
+        }
+
+        const data = await res.json();
+
+        // 2. Populate the real data
+        pane.innerHTML = `
+            <h2>Suggestions for ${fileName}</h2>
+            <p>Category: <strong>${data.category}</strong></p>
+            <p>Folder: <strong>${data.subfolder}</strong></p>
+            <button onclick="categorizeFile('${fileName}', '${data.category}', '${data.subfolder}')">
+                Accept Suggestion
+            </button>
+        `;
+    } catch (err) {
+        pane.innerHTML = `<p style="color:red;">Failed to reach AI service.</p>`;
+        console.error("Error:", err);
+    }
+}
+
+// Initial load
+document.addEventListener('DOMContentLoaded', refreshDashboard);

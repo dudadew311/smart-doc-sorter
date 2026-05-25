@@ -53,4 +53,9 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> getTree() throws IOException {
         return ResponseEntity.ok(fileOrganizerService.getFileTree());
     }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<Map<String, String>> getSuggestions(@RequestParam String fileName) {
+        return ResponseEntity.ok(fileOrganizerService.getAiSuggestionForFile(fileName));
+    }
 }

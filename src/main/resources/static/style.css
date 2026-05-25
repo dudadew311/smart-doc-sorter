@@ -45,3 +45,13 @@
     padding: 8px;
     border-bottom: 1px solid #eee;
 }
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.loading-text {
+    animation: pulse 1.5s infinite;
+}

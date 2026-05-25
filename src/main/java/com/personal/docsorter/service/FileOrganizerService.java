@@ -6,8 +6,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.sax.BodyContentHandler;
+import java.io.FileInputStream;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -19,11 +24,14 @@ public class FileOrganizerService {
     private final Tika tika = new Tika();
     private final RestTemplate restTemplate = new RestTemplate();
     private final String OLLAMA_URL = "http://localhost:11434/api/generate";
+    private final AISuggestionService aiService;
 
     public FileOrganizerService(@Value("${app.storage.staging-dir}") String stagingDir,
-                                @Value("${app.storage.target-dir}") String targetDir) throws IOException {
+                                @Value("${app.storage.target-dir}") String targetDir,
+                                AISuggestionService aiService) throws IOException {
         this.stagingPath = Paths.get(stagingDir).toAbsolutePath();
         this.targetPath = Paths.get(targetDir).toAbsolutePath();
+        this.aiService = aiService;
         Files.createDirectories(this.stagingPath);
         Files.createDirectories(this.targetPath.resolve("PENDING"));
     }
@@ -110,5 +118,42 @@ public class FileOrganizerService {
             }
         }
         return node;
+    }
+
+    public Map<String, String> getAiSuggestionForFile(String fileName) {
+        // 1. Sanitize the path - prevent "No such file" due to accidental trailing spaces/chars
+        String sanitizedName = fileName.trim();
+        Path filePath = targetPath.resolve("PENDING").resolve(sanitizedName);
+
+        // 2. Defensive check
+        if (!Files.exists(filePath)) {
+            System.err.println("File not found: " + filePath);
+            return Map.of("category", "UNCATEGORIZED", "subfolder", "MISC");
+        }
+
+        try {
+            // 3. Use BodyContentHandler to ensure deep parsing for .docx, .rtf, .pdf
+            BodyContentHandler handler = new BodyContentHandler(-1);
+            AutoDetectParser parser = new AutoDetectParser();
+            Metadata metadata = new Metadata();
+
+            try (InputStream is = Files.newInputStream(filePath)) {
+                parser.parse(is, handler, metadata);
+            }
+
+            String content = handler.toString().trim();
+
+            // 4. Return fallback if empty instead of throwing error
+            if (content.isEmpty()) {
+                return Map.of("category", "UNCATEGORIZED", "subfolder", "MISC");
+            }
+
+            return aiService.getSuggestion(content.length() > 1000 ? content.substring(0, 1000) : content);
+
+        } catch (Exception e) {
+            // Silently log and return neutral state to prevent UI red text
+            System.err.println("Parsing error: " + e.getMessage());
+            return Map.of("category", "UNCATEGORIZED", "subfolder", "MISC");
+        }
     }
 }
