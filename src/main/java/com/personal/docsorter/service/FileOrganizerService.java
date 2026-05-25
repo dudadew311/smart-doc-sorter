@@ -1,15 +1,12 @@
 package com.personal.docsorter.service;
 
-import org.apache.tika.Tika;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
-import java.io.FileInputStream;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,9 +18,6 @@ import java.util.stream.Collectors;
 public class FileOrganizerService {
     private final Path stagingPath;
     private final Path targetPath;
-    private final Tika tika = new Tika();
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final String OLLAMA_URL = "http://localhost:11434/api/generate";
     private final AISuggestionService aiService;
 
     public FileOrganizerService(@Value("${app.storage.staging-dir}") String stagingDir,
@@ -36,63 +30,33 @@ public class FileOrganizerService {
         Files.createDirectories(this.targetPath.resolve("PENDING"));
     }
 
-    // 1. Store in Staging
     public void storeInStaging(MultipartFile file) {
         try {
             String fileName = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
-            Files.copy(file.getInputStream(), stagingPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) { throw new RuntimeException("Could not store file", e); }
+            Files.copy(file.getInputStream(), this.targetPath.resolve("PENDING").resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not store file.", e);
+        }
     }
 
-    // 2. List Pending
     public List<String> listPendingFiles() {
-        try (var paths = Files.list(targetPath.resolve("PENDING"))) {
-            return paths.filter(Files::isRegularFile)
-                    .map(p -> p.getFileName().toString())
-                    .collect(Collectors.toList());
-        } catch (IOException e) { return List.of(); }
+        try (var files = Files.list(targetPath.resolve("PENDING"))) {
+            return files.map(p -> p.getFileName().toString()).collect(Collectors.toList());
+        } catch (IOException e) {
+            return Collections.emptyList();
+        }
     }
 
-    // 3. Move to Final
-    public void moveToFinalFolder(String fileName, String category, String subfolder) throws IOException {
-        Path source = targetPath.resolve("PENDING").resolve(fileName);
-        Path destDir = targetPath.resolve(category).resolve(subfolder);
+    public void moveToFinalFolder(String fileName, String fullPath) throws IOException {
+        Path destDir = targetPath;
+        // Splits by / and creates all folders
+        for (String folder : fullPath.split("/")) {
+            destDir = destDir.resolve(folder);
+        }
         Files.createDirectories(destDir);
-        Files.move(source, destDir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    public void processStagedFiles() throws Exception {
-        try (var paths = Files.list(stagingPath)) {
-            paths.filter(Files::isRegularFile).forEach(this::processFile);
-        }
-    }
-
-    private void processFile(Path file) {
-        try {
-            String content = tika.parseToString(file.toFile());
-            if (content.length() > 1000) content = content.substring(0, 1000);
-
-            // Strict Prompt: JSON only
-            String prompt = "Analyze this: " + content +
-                    ". Respond ONLY in JSON: {\"category\": \"...\", \"subfolder\": \"...\"}";
-
-            Map<String, Object> request = Map.of("model", "llama3", "prompt", prompt, "stream", false);
-            Map response = restTemplate.postForObject(OLLAMA_URL, request, Map.class);
-
-            // Here you would add logic to parse JSON response safely
-            // If parsing fails or AI is unsure -> move to targetPath/PENDING
-
-        } catch (Exception e) {
-            moveToPending(file);
-        }
-    }
-
-    private void moveToPending(Path file) {
-        try {
-            Path pending = targetPath.resolve("PENDING");
-            Files.createDirectories(pending);
-            Files.move(file, pending.resolve(file.getFileName()));
-        } catch (Exception e) { e.printStackTrace(); }
+        Files.move(targetPath.resolve("PENDING").resolve(fileName),
+                destDir.resolve(fileName),
+                StandardCopyOption.REPLACE_EXISTING);
     }
 
     public Map<String, Object> getFileTree() throws IOException {
@@ -119,41 +83,31 @@ public class FileOrganizerService {
         }
         return node;
     }
-
-    public Map<String, String> getAiSuggestionForFile(String fileName) {
-        // 1. Sanitize the path - prevent "No such file" due to accidental trailing spaces/chars
+    public Map<String, Object> getAiSuggestionForFile(String fileName) throws IOException {
         String sanitizedName = fileName.trim();
         Path filePath = targetPath.resolve("PENDING").resolve(sanitizedName);
 
-        // 2. Defensive check
         if (!Files.exists(filePath)) {
-            System.err.println("File not found: " + filePath);
-            return Map.of("category", "UNCATEGORIZED", "subfolder", "MISC");
+            return Map.of("options", List.of("UNCATEGORIZED"));
         }
 
         try {
-            // 3. Use BodyContentHandler to ensure deep parsing for .docx, .rtf, .pdf
             BodyContentHandler handler = new BodyContentHandler(-1);
             AutoDetectParser parser = new AutoDetectParser();
-            Metadata metadata = new Metadata();
-
             try (InputStream is = Files.newInputStream(filePath)) {
-                parser.parse(is, handler, metadata);
+                parser.parse(is, handler, new Metadata());
             }
 
             String content = handler.toString().trim();
+            String treeContext = getFileTree().toString();
 
-            // 4. Return fallback if empty instead of throwing error
-            if (content.isEmpty()) {
-                return Map.of("category", "UNCATEGORIZED", "subfolder", "MISC");
-            }
+            // This now correctly receives a List<String>
+            List<String> paths = aiService.getSuggestion(content, treeContext);
 
-            return aiService.getSuggestion(content.length() > 1000 ? content.substring(0, 1000) : content);
+            return Map.of("options", paths);
 
         } catch (Exception e) {
-            // Silently log and return neutral state to prevent UI red text
-            System.err.println("Parsing error: " + e.getMessage());
-            return Map.of("category", "UNCATEGORIZED", "subfolder", "MISC");
+            return Map.of("options", List.of("UNCATEGORIZED"));
         }
     }
 }
