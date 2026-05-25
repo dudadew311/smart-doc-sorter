@@ -50,6 +50,13 @@ public class DocumentController {
         return ResponseEntity.ok(fileOrganizerService.getFileTree());
     }
 
+    // Add to DocumentController.java
+    @GetMapping("/children")
+    public ResponseEntity<List<Map<String, Object>>> getChildren(@RequestParam(defaultValue = "/") String path) throws IOException {
+        return ResponseEntity.ok(fileOrganizerService.getChildren(path));
+    }
+
+
     // Explicitly using Map<String, Object> to ensure compatibility with
     // the List return from the service
     @GetMapping("/suggestions")

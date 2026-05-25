@@ -5,15 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
-    const stagingList = document.getElementById('stagingList');
     const uploadAllBtn = document.getElementById('uploadAllBtn');
     const clearStagedBtn = document.getElementById('clearStagedBtn');
 
-    // UI Trigger
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => addFilesToStaging(e.target.files));
 
-    // Drag and Drop
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; });
     dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#cbd5e1'; });
     dropZone.addEventListener('drop', (e) => {
@@ -22,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addFilesToStaging(e.dataTransfer.files);
     });
 
-    // Upload All
     uploadAllBtn.addEventListener('click', async () => {
         for (const file of stagedFiles) {
             const formData = new FormData();
@@ -33,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshDashboard();
     });
 
-    // Clear
     clearStagedBtn.addEventListener('click', () => resetStaging());
 });
 
@@ -64,6 +59,25 @@ function resetStaging() {
     document.getElementById('clearStagedBtn').style.display = 'none';
 }
 
+// --- STATE MANAGEMENT (Persistence) ---
+function getExpandedFolders() {
+    return JSON.parse(localStorage.getItem('expandedFolders') || '[]');
+}
+
+function saveExpandedFolder(path) {
+    let expanded = getExpandedFolders();
+    if (!expanded.includes(path)) {
+        expanded.push(path);
+        localStorage.setItem('expandedFolders', JSON.stringify(expanded));
+    }
+}
+
+function removeExpandedFolder(path) {
+    let expanded = getExpandedFolders();
+    expanded = expanded.filter(p => p !== path);
+    localStorage.setItem('expandedFolders', JSON.stringify(expanded));
+}
+
 // --- DASHBOARD CORE ---
 async function refreshDashboard() {
     try {
@@ -86,56 +100,74 @@ async function refreshDashboard() {
 
 // --- EXPLORER PANE ---
 async function loadExplorer() {
+    const explorerPane = document.getElementById('explorerPane');
+    explorerPane.innerHTML = '<h2>File Explorer</h2>';
+    const rootContainer = document.createElement('div');
+    explorerPane.appendChild(rootContainer);
+    await fetchChildren('/', rootContainer);
+}
+
+async function fetchChildren(path, containerElement) {
     try {
-        const res = await fetch('/api/v1/documents/tree');
-        const data = await res.json();
-        const explorerPane = document.getElementById('explorerPane');
-        explorerPane.innerHTML = `<h2>File Explorer</h2>` + renderTree(data);
+        const res = await fetch(`/api/v1/documents/children?path=${encodeURIComponent(path)}`);
+        const files = await res.json();
+
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.paddingLeft = '20px';
+
+        const expandedFolders = getExpandedFolders();
+
+        files.forEach(file => {
+            const li = document.createElement('li');
+            li.className = 'tree-node';
+
+            const isExpanded = expandedFolders.includes(file.path);
+            const arrow = file.isDirectory ? `<span class="toggle" style="cursor:pointer;" onclick="toggleDir(this, '${file.path}')">${isExpanded ? '▼' : '▶'}</span> ` : "  ";
+
+            li.innerHTML = `${arrow}<span onclick="selectFolder('${file.path}')" style="cursor:pointer;">${file.isDirectory ? "📁 " : "📄 "}${file.name}</span>`;
+
+            const childrenContainer = document.createElement('div');
+            childrenContainer.style.display = isExpanded ? 'block' : 'none';
+            li.appendChild(childrenContainer);
+
+            ul.appendChild(li);
+
+            // Auto-load if previously expanded
+            if (isExpanded) {
+                fetchChildren(file.path, childrenContainer);
+            }
+        });
+
+        containerElement.innerHTML = '';
+        containerElement.appendChild(ul);
     } catch (err) { console.error(err); }
 }
 
-function renderTree(node, depth = 0, currentPath = "") {
-    const isDir = node.isDirectory;
-    const nodePath = currentPath ? `${currentPath}/${node.name}` : node.name;
-    const arrow = isDir ? `<span class="toggle" onclick="toggleFolder(event)">▶</span> ` : "  ";
-    const icon = isDir ? "📁 " : "📄 ";
+async function toggleDir(arrowElement, path) {
+    const container = arrowElement.parentElement.querySelector('div');
 
-    let html = `
-        <div class="tree-node" style="padding-left: ${depth * 20}px;">
-            ${arrow}
-            <span class="tree-label" onclick="selectFolder('${nodePath}')" style="cursor: pointer;">${icon}${node.name}</span>
-        </div>`;
-
-    if (isDir && node.children && node.children.length > 0) {
-        html += `<div class="tree-children" style="display: block;">` +
-                node.children.map(child => renderTree(child, depth + 1, nodePath)).join('') + `</div>`;
-    }
-    return html;
-}
-
-function toggleFolder(event) {
-    event.stopPropagation();
-    const arrow = event.target;
-    const children = arrow.closest('.tree-node').nextElementSibling;
-    if (children && children.classList.contains('tree-children')) {
-        const isHidden = children.style.display === 'none';
-        children.style.display = isHidden ? 'block' : 'none';
-        arrow.innerText = isHidden ? '▶' : '▼';
+    if (container.style.display === 'none') {
+        await fetchChildren(path, container);
+        container.style.display = 'block';
+        arrowElement.innerText = '▼';
+        saveExpandedFolder(path);
+    } else {
+        container.style.display = 'none';
+        arrowElement.innerText = '▶';
+        removeExpandedFolder(path);
     }
 }
 
 // --- SUGGESTION PANE ---
 async function loadSuggestion(fileName) {
     const pane = document.getElementById('suggestionsPane');
-
-    // Hourglass Loading State
     pane.innerHTML = `
         <h2>Suggestions for ${fileName}</h2>
         <div style="display: flex; align-items: center; padding: 20px;">
-            <div class="hourglass" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+            <div class="hourglass"></div>
             <p>AI is thinking...</p>
         </div>
-        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
     `;
 
     try {
@@ -177,7 +209,15 @@ async function categorizeFile(fileName, fullPath) {
 }
 
 function applyCustom(fileName) {
-    const customPath = document.getElementById('customPath').value;
-    if (customPath) categorizeFile(fileName, customPath);
-    else alert("Please enter a valid path.");
+    const customPathInput = document.getElementById('customPath');
+    let customPath = customPathInput.value.trim();
+
+    if (customPath) {
+        if (customPath.startsWith('/')) {
+            customPath = customPath.substring(1);
+        }
+        categorizeFile(fileName, customPath);
+    } else {
+        alert("Please enter a valid path.");
+    }
 }
