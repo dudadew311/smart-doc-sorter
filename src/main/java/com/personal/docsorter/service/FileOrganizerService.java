@@ -48,12 +48,11 @@ public class FileOrganizerService {
     }
 
     public void moveToFinalFolder(String fileName, String fullPath) throws IOException {
-        Path destDir = targetPath;
-        // Splits by / and creates all folders
-        for (String folder : fullPath.split("/")) {
-            destDir = destDir.resolve(folder);
-        }
+        Path destDir = targetPath.resolve(fullPath);
+
         Files.createDirectories(destDir);
+
+        // Move the file into that directory
         Files.move(targetPath.resolve("PENDING").resolve(fileName),
                 destDir.resolve(fileName),
                 StandardCopyOption.REPLACE_EXISTING);

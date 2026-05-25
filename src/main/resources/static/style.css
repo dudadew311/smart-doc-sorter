@@ -1,68 +1,102 @@
-/* Add this to style.css */
-.dashboard {
-    display: flex;
-    height: 100vh;
-    gap: 10px;
-}
-.pane {
-    flex: 1;
-    border: 1px solid #ccc;
-    padding: 15px;
-    overflow-y: auto;
-    background: #fdfdfd;
+:root {
+    --primary: #2563eb;
+    --bg: #f8fafc;
+    --pane-bg: #ffffff;
+    --text: #1e293b;
 }
 
-.tree-node {
-    padding: 4px 0;
+body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
+
+.main-header { text-align: center; margin-bottom: 30px; }
+.main-header h1 { color: var(--primary); margin: 0; }
+
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    max-width: 1400px;
+    margin: auto;
+}
+
+.pane {
+    background: var(--pane-bg);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+
+    /* ADD THESE LINES */
+    height: 700px;           /* Fixed height keeps boxes steady */
+    max-height: 700px;       /* Prevents expansion */
+    overflow-y: auto;        /* Allows scrolling inside if content is long */
+    border: none;
+}
+
+.box {
+    border: 2px dashed #cbd5e1;
+    padding: 20px;
+    text-align: center;
+    border-radius: 8px;
+    background: #f1f5f9;
+    cursor: pointer;
+}
+
+button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 8px;
     transition: background 0.2s;
 }
 
-.tree-node:hover {
-    background-color: #f0f0f0;
-}
-
-.tree-children {
-    display: block; /* Default to expanded */
-}
-.box {
-    border: 2px dashed #ccc;
-    padding: 30px;
-    text-align: center;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    cursor: pointer;
-    background-color: #fafafa;
-}
-.box.dragover {
-    border-color: #007bff;
-    background-color: #e7f1ff;
-}
+button:hover { background: #1d4ed8; }
 
 .pending-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px;
-    border-bottom: 1px solid #eee;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-
-.loading-text {
-    animation: pulse 1.5s infinite;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border: 1px solid #e2e8f0;
 }
 
 .hourglass {
     display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
+    width: 24px;
+    height: 24px;
+    border: 3px solid #e2e8f0;
+    border-top: 3px solid var(--primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    margin-right: 10px;
+    vertical-align: middle;
 }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.toggle {
+    display: inline-block;
+    width: 15px;
+    font-size: 0.8em;
+    color: #64748b;
+}
+
+#customPath {
+    width: 100%;             /* Fills the entire width */
+    padding: 15px;           /* Larger padding for better touch/click area */
+    font-size: 1.1rem;       /* Larger, more readable font */
+    box-sizing: border-box;  /* Ensures padding doesn't push it out of bounds */
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+#customPath:focus {
+    outline: none;
+    border-color: var(--primary);
+}
