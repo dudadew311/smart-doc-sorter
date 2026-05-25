@@ -1,15 +1,47 @@
-/* src/main/resources/static/style.css */
-.box {
-    border: 2px dashed #ccc;
-    padding: 40px;
-    text-align: center;
-    margin: 20px;
-    border-radius: 10px;
-    transition: 0.3s;
-    background-color: #ffffff;
+/* Add this to style.css */
+.dashboard {
+    display: flex;
+    height: 100vh;
+    gap: 10px;
+}
+.pane {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 15px;
+    overflow-y: auto;
+    background: #fdfdfd;
 }
 
-.dragover {
+.tree-node {
+    padding: 4px 0;
+    transition: background 0.2s;
+}
+
+.tree-node:hover {
+    background-color: #f0f0f0;
+}
+
+.tree-children {
+    display: block; /* Default to expanded */
+}
+.box {
+    border: 2px dashed #ccc;
+    padding: 30px;
+    text-align: center;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    background-color: #fafafa;
+}
+.box.dragover {
     border-color: #007bff;
-    background-color: #f8f9fa;
+    background-color: #e7f1ff;
+}
+
+.pending-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
 }

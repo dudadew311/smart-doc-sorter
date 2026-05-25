@@ -1,83 +1,105 @@
-// src/main/resources/static/scripts.js
-let stagedFiles = [];
-const dropZone = document.getElementById('dropZone');
-const fileNameDisplay = document.getElementById('fileNameDisplay');
+// Function to render the tree with icons and toggle functionality
+function renderTree(node) {
+    const isDir = node.isDirectory;
+    const icon = isDir ? "📁 " : "📄 ";
 
-// Handle Drag & Drop
-dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', (e) => { dropZone.classList.remove('dragover'); });
+    let html = `<div class="tree-node" style="cursor: ${isDir ? 'pointer' : 'default'};">
+                    ${icon} <strong>${node.name}</strong>
+                </div>`;
+
+    if (isDir && node.children) {
+        html += `<div class="tree-children" style="margin-left: 20px;">` +
+                node.children.map(renderTree).join('') +
+                `</div>`;
+    }
+    return html;
+}
+
+// Function to activate the collapse/expand toggles
+function attachTreeListeners() {
+    document.querySelectorAll('.tree-node').forEach(node => {
+        node.addEventListener('click', (e) => {
+            const children = node.nextElementSibling;
+            if (children && children.classList.contains('tree-children')) {
+                children.style.display = (children.style.display === 'none') ? 'block' : 'none';
+            }
+        });
+    });
+}
+
+// The single "Source of Truth" for updating the dashboard
+async function refreshDashboard() {
+    // 1. Load Pending Files (Center Pane)
+    fetch('/api/v1/documents/pending')
+        .then(res => res.json())
+        .then(files => {
+            const listContainer = document.getElementById('fileList');
+            listContainer.innerHTML = files.map(f => `
+                <div class="pending-item">
+                    <span>${f}</span>
+                    <button onclick="categorizeFile('${f}', 'ACADEMIC', 'PAPERS')">Sort to Academic</button>
+                </div>
+            `).join('');
+        });
+
+    // 2. Load Explorer Tree (Right Pane)
+    fetch('/api/v1/documents/tree')
+        .then(res => res.json())
+        .then(tree => {
+            const container = document.getElementById('explorerPane');
+            container.innerHTML = '<h2>Explorer</h2>' + renderTree(tree);
+            attachTreeListeners();
+        });
+}
+
+// Initial load on page start
+document.addEventListener('DOMContentLoaded', refreshDashboard);
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+// Click to upload
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+// Drag and drop handlers
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files); // Pass the FileList directly
-    }
+    handleFiles(e.dataTransfer.files);
 });
 
-// Handle File Picker & Drag-and-Drop uniformly
-function handleFileSelect(files) {
-    stagedFiles = Array.from(files);
-    fileNameDisplay.textContent = "Staged: " + stagedFiles.length + " file(s)";
-}
+async function handleFiles(files) {
+    const formData = new FormData();
+    formData.append('file', files[0]);
 
-async function processUpload() {
-    if (stagedFiles.length === 0) { alert("Please select files first!"); return; }
-
-    // 1. Upload files
-    for (const file of stagedFiles) {
-        const formData = new FormData();
-        formData.append('file', file);
-        await fetch('/api/v1/documents/upload', { method: 'POST', body: formData });
-    }
-
-    // 2. Trigger sort
-    await fetch('/api/v1/documents/sort', { method: 'POST' });
-
-    // 3. Immediately refresh to see if anything landed in PENDING
-    await loadPendingFiles();
-
-    stagedFiles = [];
-    fileNameDisplay.textContent = "Upload complete. Check below for files needing attention.";
-}
-
-async function loadPendingFiles() {
-    const res = await fetch('/api/v1/documents/pending');
-    const files = await res.json();
-
-    const listDiv = document.getElementById('pendingFileList');
-    listDiv.innerHTML = ''; // Clear old list
-
-    if (files.length > 0) {
-        document.getElementById('pendingSection').style.display = 'block';
-
-        // Create a dropdown so you can pick which file to categorize
-        const select = document.createElement('select');
-        select.id = 'fileSelector';
-        files.forEach(f => {
-            const opt = document.createElement('option');
-            opt.value = f;
-            opt.textContent = f;
-            select.appendChild(opt);
-        });
-        listDiv.appendChild(select);
-    } else {
-        document.getElementById('pendingSection').style.display = 'none';
-    }
-}
-
-// Call this on window load
-window.onload = loadPendingFiles;
-
-async function submitCategorization() {
-    // Point to the selector we just created in loadPendingFiles
-    const fileName = document.getElementById('fileSelector').value;
-    const category = document.getElementById('catSelect').value;
-    const subfolder = document.getElementById('newSubclass').value;
-
-    await fetch(`/api/v1/documents/categorize?fileName=${fileName}&category=${category}&subfolder=${subfolder}`, {
-        method: 'POST'
+    await fetch('/api/v1/documents/upload', {
+        method: 'POST',
+        body: formData
     });
 
-    alert("File moved successfully!");
-    location.reload(); // Quickest way to clean up the UI
+    // Refresh the dashboard after upload
+    refreshDashboard();
+}
+
+async function categorizeFile(fileName, category, subfolder) {
+    const formData = new URLSearchParams();
+    formData.append('fileName', fileName);
+    formData.append('category', category);
+    formData.append('subfolder', subfolder);
+
+    await fetch('/api/v1/documents/categorize', {
+        method: 'POST',
+        body: formData
+    });
+
+    // Refresh to update both the Pending list and the Explorer tree
+    refreshDashboard();
 }
