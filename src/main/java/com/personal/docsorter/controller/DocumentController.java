@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -46,5 +47,10 @@ public class DocumentController {
                                              @RequestParam String subfolder) throws Exception {
         fileOrganizerService.moveToFinalFolder(fileName, category, subfolder);
         return ResponseEntity.ok("SUCCESS");
+    }
+
+    @GetMapping("/tree")
+    public ResponseEntity<Map<String, Object>> getTree() throws IOException {
+        return ResponseEntity.ok(fileOrganizerService.getFileTree());
     }
 }
