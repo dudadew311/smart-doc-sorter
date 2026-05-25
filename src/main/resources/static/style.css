@@ -100,3 +100,8 @@ button:hover { background: #1d4ed8; }
     outline: none;
     border-color: var(--primary);
 }
+
+#dropZone {
+    cursor: pointer;
+    transition: border-color 0.2s;
+}

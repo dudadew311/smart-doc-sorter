@@ -1,9 +1,11 @@
 package com.personal.docsorter.controller;
 
 import com.personal.docsorter.service.FileOrganizerService;
+import org.apache.tika.exception.TikaException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.xml.sax.SAXException;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,6 +23,7 @@ public class DocumentController {
 
     @PostMapping("/upload")
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) {
+        // This now only runs when the user clicks 'Upload All'
         fileOrganizerService.storeInStaging(file);
         return ResponseEntity.ok("SUCCESS");
     }
@@ -50,7 +53,7 @@ public class DocumentController {
     // Explicitly using Map<String, Object> to ensure compatibility with
     // the List return from the service
     @GetMapping("/suggestions")
-    public ResponseEntity<Map<String, Object>> getSuggestions(@RequestParam String fileName) throws IOException {
+    public ResponseEntity<Map<String, Object>> getSuggestions(@RequestParam String fileName) throws IOException, TikaException, SAXException {
         return ResponseEntity.ok(fileOrganizerService.getAiSuggestionForFile(fileName));
     }
 }
