@@ -7,9 +7,13 @@ import java.util.*;
 
 @Service
 public class AISuggestionService {
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String OLLAMA_URL = "http://localhost:11434/api/generate";
+
+    public AISuggestionService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public Map<String, Object> getSuggestion(String fileContent, String currentTree) {
         try {
