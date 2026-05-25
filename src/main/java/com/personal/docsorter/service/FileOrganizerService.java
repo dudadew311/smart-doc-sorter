@@ -48,9 +48,21 @@ public class FileOrganizerService {
     }
 
     public void moveToFinalFolder(String fileName, String fullPath) throws IOException {
-        Path destDir = targetPath.resolve(fullPath);
+        // 1. Sanitize the path: remove leading slashes and trim spaces
+        String sanitizedPath = fullPath.trim();
+        if (sanitizedPath.startsWith("/")) {
+            sanitizedPath = sanitizedPath.substring(1);
+        }
+
+        // 2. Resolve correctly
+        Path destDir = targetPath.resolve(sanitizedPath);
+
+        // 3. Ensure the directory exists
         Files.createDirectories(destDir);
-        Files.move(targetPath.resolve("PENDING").resolve(fileName), destDir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+        // 4. Move the file
+        Path sourceFile = targetPath.resolve("PENDING").resolve(fileName.trim());
+        Files.move(sourceFile, destDir.resolve(fileName.trim()), StandardCopyOption.REPLACE_EXISTING);
     }
 
     public Map<String, Object> getAiSuggestionForFile(String fileName) throws IOException, TikaException, SAXException {
@@ -102,5 +114,23 @@ public class FileOrganizerService {
             }
         }
         return node;
+    }
+
+    public List<Map<String, Object>> getChildren(String path) throws IOException {
+        // Treat "/" as the target directory root
+        Path dir = path.equals("/") ? targetPath : targetPath.resolve(path.substring(1));
+
+        try (var stream = Files.list(dir)) {
+            return stream
+                    .filter(p -> !p.getFileName().toString().equals("PENDING"))
+                    .map(p -> {
+                        Map<String, Object> node = new LinkedHashMap<>();
+                        node.put("name", p.getFileName().toString());
+                        node.put("isDirectory", Files.isDirectory(p));
+                        node.put("path", "/" + targetPath.relativize(p).toString());
+                        return node;
+                    })
+                    .collect(Collectors.toList());
+        }
     }
 }
