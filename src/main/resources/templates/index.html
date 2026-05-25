@@ -5,17 +5,29 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="dashboard">
+<header class="main-header">
+    <h1>SmartFile Sorter</h1>
+    <p>AI-powered organization. Drag, drop, and let the AI suggest where your files belong.</p>
+</header>
+
+<div class="dashboard-container">
     <div id="pendingPane" class="pane">
-        <h2>Pending</h2>
+        <h2>Pending Files</h2>
         <div id="dropZone" class="box">
-            <p>Drag & Drop files here or click to upload</p>
+            <p>Drag & Drop here or click to upload</p>
             <input type="file" id="fileInput" style="display:none;" />
         </div>
         <div id="fileList"></div>
     </div>
-    <div id="suggestionsPane" class="pane"><h2>Suggestions</h2></div>
-    <div id="explorerPane" class="pane"><h2>Explorer</h2></div>
+
+    <div id="suggestionsPane" class="pane">
+        <h2>AI Suggestions</h2>
+        <p class="guide">Select a file to see intelligent folder suggestions.</p>
+    </div>
+
+    <div id="explorerPane" class="pane">
+        <h2>File Explorer</h2>
+    </div>
 </div>
 <script src="scripts.js"></script>
 </body>

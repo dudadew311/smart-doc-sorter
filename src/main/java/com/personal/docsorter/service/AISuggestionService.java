@@ -14,8 +14,10 @@ public class AISuggestionService {
     // Changed return type to List<String> to match your goal
     public List<String> getSuggestion(String fileContent, String currentTree) {
         try {
-            String prompt = "You are a filing assistant. Current folder structure: " + currentTree +
-                    ". Suggest 3 paths for this file content. Return ONLY a JSON list of strings, e.g. [\"Path1\", \"Path2\"]. " +
+            String prompt = "You are a professional filing assistant. Current folder structure: " + currentTree +
+                    ". Analyze the following file content and suggest 3 distinct, complete FOLDER PATHS only." +
+                    " DO NOT include any filenames in your response. " +
+                    "Return ONLY a JSON list of strings, e.g. [\"Work/Projects\", \"Finance/Taxes\"]." +
                     "Content: " + fileContent;
 
             Map<String, Object> request = Map.of("model", "llama3", "prompt", prompt, "stream", false);
