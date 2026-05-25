@@ -1,36 +1,22 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en">
 <head>
-    <title>DocSorter Dashboard</title>
-    <link rel="stylesheet" type="text/css" href="/style.css">
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="box" id="dropZone">
-    <h1>Smart Doc Sorter</h1>
-    <p>Drag & Drop file here or</p>
-
-    <input type="file" id="fileInput" multiple onchange="handleFileSelect(this.files)" />
-
-    <p id="fileNameDisplay"></p>
-    <br>
-    <button onclick="processUpload()">Upload & Sort</button>
+<div class="dashboard">
+    <div id="suggestionsPane" class="pane"><h2>Suggestions</h2></div>
+    <div id="pendingPane" class="pane">
+        <h2>Pending</h2>
+        <div id="dropZone" class="box">
+            <p>Drag & Drop files here or click to upload</p>
+            <input type="file" id="fileInput" style="display:none;" />
+        </div>
+        <div id="fileList"></div>
+    </div>
+    <div id="explorerPane" class="pane"><h2>Explorer</h2></div>
 </div>
-
-<div id="pendingSection" style="display:none;">
-    <h2>Needs Categorization</h2>
-    <div id="pendingFileList"></div>
-    <select id="catSelect" onchange="updateSubclasses()">
-        <option value="ACADEMIC">ACADEMIC</option>
-        <option value="PERSONAL">PERSONAL</option>
-    </select>
-    <input type="text" id="newSubclass" placeholder="New Subclass Name">
-    <button onclick="submitCategorization()">Save Category</button>
-</div>
-
-<nav>
-    <a href="/settings">Go to Settings</a>
-</nav>
-
-<script src="/scripts.js"></script>
+<script src="scripts.js"></script>
 </body>
 </html>
