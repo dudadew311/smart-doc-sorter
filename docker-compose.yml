@@ -1,0 +1,27 @@
+services:
+  doc-sorter:
+    build: .
+    container_name: smart-doc-sorter
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_STORAGE_STAGING_DIR=/app/storage/staging
+      - APP_STORAGE_TARGET_DIR=/app/storage/target
+      - OLLAMA_URL=http://ollama:11434/api/generate
+      - AI_MODEL_NAME=tinyllama
+    volumes:
+      - /Volume2/homes/${USER_DIR}/docker/smart-doc-sorter/staging:/app/storage/staging
+      - /Volume2/homes/${USER_DIR}:/app/storage/target
+    user: "0:0"
+    restart: unless-stopped
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - /Volume2/docker/ollama:/root/.ollama
+    restart: unless-stopped

@@ -1,18 +1,15 @@
-# Use a lightweight OpenJDK 17 image
-FROM eclipse-temurin:17-jre-jammy
-
-# Set the working directory inside the container
+# Stage 1: Build the application
+FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
 
-# Create the storage directories with proper permissions
+# Stage 2: Create the runtime image
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
+# Copy the built JAR from the build stage
+COPY --from=build /app/target/*.jar app.jar
+# Create storage directories
 RUN mkdir -p /app/storage/staging /app/storage/target
-
-# Copy the built jar file from the target directory into the container
-# Note: Ensure you have built the project with 'mvn package' first
-COPY target/*.jar app.jar
-
-# Expose the application port
 EXPOSE 8080
-
-# Command to run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
