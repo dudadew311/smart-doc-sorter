@@ -135,8 +135,13 @@ public class FileOrganizerService {
     }
 
     public List<Map<String, Object>> getChildren(String path) throws IOException {
-        // Treat "/" as the target directory root
-        Path dir = path.equals("/") ? targetPath : targetPath.resolve(path.substring(1));
+        // Ensure path is handled correctly relative to targetPath
+        Path dir = path.equals("/") ? targetPath : targetPath.resolve(path.startsWith("/") ? path.substring(1) : path);
+
+        // Add a safety check to ensure we don't escape the target directory
+        if (!dir.toAbsolutePath().startsWith(targetPath.toAbsolutePath())) {
+            throw new SecurityException("Invalid path access");
+        }
 
         try (var stream = Files.list(dir)) {
             return stream
@@ -145,7 +150,8 @@ public class FileOrganizerService {
                         Map<String, Object> node = new LinkedHashMap<>();
                         node.put("name", p.getFileName().toString());
                         node.put("isDirectory", Files.isDirectory(p));
-                        node.put("path", "/" + targetPath.relativize(p).toString());
+                        // Store the relative path for frontend requests
+                        node.put("path", "/" + targetPath.relativize(p).toString().replace("\\", "/"));
                         return node;
                     })
                     .collect(Collectors.toList());
