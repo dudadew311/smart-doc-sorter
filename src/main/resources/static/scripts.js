@@ -1,114 +1,6 @@
-// --- INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', () => {
-    refreshDashboard();
-    loadExplorer();
-
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const uploadAllBtn = document.getElementById('uploadAllBtn');
-    const clearStagedBtn = document.getElementById('clearStagedBtn');
-
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            addFilesToStaging(e.target.files);
-            fileInput.value = '';
-        }
-    });
-
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; });
-    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#cbd5e1'; });
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = '#cbd5e1';
-
-        const items = e.dataTransfer.items;
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i].webkitGetAsEntry();
-            if (item) traverseEntry(item);
-        }
-    });
-    document.getElementById('collapseAllBtn').addEventListener('click', () => {
-            localStorage.removeItem('expandedFolders'); // Clear state
-            loadExplorer(); // Re-render tree
-        });
-
-    uploadAllBtn.addEventListener('click', async () => {
-        for (const item of stagedFiles) {
-            const formData = new FormData();
-            formData.append('file', item.file);
-            formData.append('fullPath', item.fullPath);
-            await fetch('/api/v1/documents/upload', { method: 'POST', body: formData });
-        }
-        resetStaging();
-
-        // Debug: Check if the server actually sees the new files
-        const response = await fetch('/api/v1/documents/pending');
-        const data = await response.json();
-        console.log("Pending files on server:", data);
-
-        refreshDashboard();
-    });
-
-    clearStagedBtn.addEventListener('click', () => resetStaging());
-});
-
-async function traverseEntry(entry, path = "") {
-    if (entry.isFile) {
-        entry.file(file => {
-            const fullPath = path + file.name;
-            stagedFiles.push({ file, fullPath });
-            renderStaging(); // Now this function exists
-        });
-    } else if (entry.isDirectory) {
-        const reader = entry.createReader();
-        reader.readEntries(entries => {
-            entries.forEach(e => traverseEntry(e, path + entry.name + "/"));
-        });
-    }
-}
-
+// --- STATE MANAGEMENT ---
 let stagedFiles = [];
 
-function addFilesToStaging(files) {
-    // Ensure we are iterating correctly
-    Array.from(files).forEach(file => {
-        // Double check: is file.name valid?
-        stagedFiles.push({ file: file, fullPath: file.name });
-    });
-    // This calls the rendering logic that shows your buttons
-    renderStaging();
-}
-
-function renderStaging() {
-    const stagingList = document.getElementById('stagingList');
-    const uploadAllBtn = document.getElementById('uploadAllBtn');
-    const clearStagedBtn = document.getElementById('clearStagedBtn');
-
-    stagingList.innerHTML = '';
-
-    stagedFiles.forEach((item) => {
-        const li = document.createElement('li');
-        li.textContent = item.fullPath;
-        stagingList.appendChild(li);
-    });
-
-    // Use classList for visibility consistency
-    if (stagedFiles.length > 0) {
-        uploadAllBtn.classList.remove('hidden');
-        clearStagedBtn.classList.remove('hidden');
-    } else {
-        uploadAllBtn.classList.add('hidden');
-        clearStagedBtn.classList.add('hidden');
-    }
-}
-
-function resetStaging() {
-    stagedFiles = [];
-    renderStaging(); // Clears the list
-}
-
-// --- STATE MANAGEMENT (Persistence) ---
 function getExpandedFolders() {
     return JSON.parse(localStorage.getItem('expandedFolders') || '[]');
 }
@@ -127,33 +19,140 @@ function removeExpandedFolder(path) {
     localStorage.setItem('expandedFolders', JSON.stringify(expanded));
 }
 
-// --- DASHBOARD CORE ---
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', () => {
+    refreshDashboard();
+    loadExplorer();
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadAllBtn = document.getElementById('uploadAllBtn');
+    const clearStagedBtn = document.getElementById('clearStagedBtn');
+
+    // FIX: Add e.stopPropagation() to ensure the click doesn't bubble incorrectly
+        dropZone.addEventListener('click', (e) => {
+            // Only trigger if the click target is the dropZone itself or its paragraph
+            if (e.target === dropZone || e.target.tagName === 'P') {
+                fileInput.click();
+            }
+        });
+
+    // FIX: Check if files exist to prevent double-processing or re-opening
+        fileInput.addEventListener('change', (e) => {
+            e.stopPropagation(); // Stop the event from bubbling up to the dropZone
+            if (e.target.files && e.target.files.length > 0) {
+                addFilesToStaging(e.target.files);
+                fileInput.value = ''; // Reset the input field
+            }
+        });
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#2563eb';
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = '#cbd5e1';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#cbd5e1';
+        const items = e.dataTransfer.items;
+        if (items) {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i].webkitGetAsEntry();
+                if (item) traverseEntry(item);
+            }
+        }
+    });
+
+    document.getElementById('collapseAllBtn').addEventListener('click', () => {
+        localStorage.removeItem('expandedFolders');
+        loadExplorer();
+    });
+
+    uploadAllBtn.addEventListener('click', async () => {
+        for (const item of stagedFiles) {
+            const formData = new FormData();
+            formData.append('file', item.file);
+            formData.append('fullPath', item.fullPath);
+            await fetch('/api/v1/documents/upload', { method: 'POST', body: formData });
+        }
+        resetStaging();
+        refreshDashboard();
+    });
+
+    clearStagedBtn.addEventListener('click', () => resetStaging());
+});
+
+// --- HELPER FUNCTIONS ---
+
+async function traverseEntry(entry, path = "") {
+    if (entry.isFile) {
+        entry.file(file => {
+            const fullPath = path + file.name;
+            stagedFiles.push({ file, fullPath });
+            renderStaging();
+        });
+    } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        reader.readEntries(entries => {
+            entries.forEach(e => traverseEntry(e, path + entry.name + "/"));
+        });
+    }
+}
+
+function addFilesToStaging(files) {
+    Array.from(files).forEach(file => {
+        stagedFiles.push({ file: file, fullPath: file.name });
+    });
+    renderStaging();
+}
+
+function renderStaging() {
+    const stagingList = document.getElementById('stagingList');
+    const uploadAllBtn = document.getElementById('uploadAllBtn');
+    const clearStagedBtn = document.getElementById('clearStagedBtn');
+    stagingList.innerHTML = '';
+    stagedFiles.forEach((item) => {
+        const li = document.createElement('li');
+        li.textContent = item.fullPath;
+        stagingList.appendChild(li);
+    });
+    if (stagedFiles.length > 0) {
+        uploadAllBtn.classList.remove('hidden');
+        clearStagedBtn.classList.remove('hidden');
+    } else {
+        uploadAllBtn.classList.add('hidden');
+        clearStagedBtn.classList.add('hidden');
+    }
+}
+
+function resetStaging() {
+    stagedFiles = [];
+    renderStaging();
+}
+
 async function refreshDashboard() {
     try {
         const res = await fetch('/api/v1/documents/pending');
-        const items = await res.json(); // Now receiving {name: "...", isDirectory: boolean}
+        const items = await res.json();
         const fileList = document.getElementById('fileList');
-
         fileList.innerHTML = items.map(item => `
             <div class="pending-item" data-name="${item.name}" style="cursor: pointer; padding: 8px; border-bottom: 1px solid #eee;">
                 <span>${item.isDirectory ? '📁' : '📄'} ${item.name}</span>
             </div>
         `).join('');
-
-        // Attach click listeners to every item
         document.querySelectorAll('.pending-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const fileName = item.getAttribute('data-name');
-                loadSuggestion(fileName); // This function fetches AI suggestions
-            });
+            item.addEventListener('click', () => loadSuggestion(item.getAttribute('data-name')));
         });
-    } catch (err) { console.error('Error refreshing dashboard:', err); }
+    } catch (err) { console.error(err); }
 }
 
-// --- EXPLORER PANE ---
 async function loadExplorer() {
     const content = document.getElementById('explorerContent');
-    content.innerHTML = ''; // Clear existing
+    content.innerHTML = '';
     const rootContainer = document.createElement('div');
     content.appendChild(rootContainer);
     await fetchChildren('/', rootContainer);
@@ -163,34 +162,30 @@ async function fetchChildren(path, containerElement) {
     try {
         const res = await fetch(`/api/v1/documents/children?path=${encodeURIComponent(path)}`);
         const files = await res.json();
-
         const ul = document.createElement('ul');
         ul.style.listStyle = 'none';
         ul.style.paddingLeft = '20px';
-
         const expandedFolders = getExpandedFolders();
 
         files.forEach(file => {
             const li = document.createElement('li');
-            li.className = 'tree-node';
-
             const isExpanded = expandedFolders.includes(file.path);
-            const arrow = file.isDirectory ? `<span class="toggle" style="cursor:pointer;" onclick="toggleDir(this, '${file.path}')">${isExpanded ? '▼' : '▶'}</span> ` : "  ";
-
-            li.innerHTML = `${arrow}<span onclick="selectFolder('${file.path}')" style="cursor:pointer;">${file.isDirectory ? "📁 " : "📄 "}${file.name}</span>`;
-
+            const arrow = document.createElement('span');
+            arrow.style.cursor = 'pointer';
+            arrow.innerText = file.isDirectory ? (isExpanded ? '▼ ' : '▶ ') : '  ';
+            arrow.onclick = () => toggleDir(arrow, file.path);
+            const label = document.createElement('span');
+            label.style.cursor = 'pointer';
+            label.innerText = (file.isDirectory ? "📁 " : "📄 ") + file.name;
+            label.onclick = () => selectFolder(file.path);
+            li.appendChild(arrow);
+            li.appendChild(label);
             const childrenContainer = document.createElement('div');
             childrenContainer.style.display = isExpanded ? 'block' : 'none';
             li.appendChild(childrenContainer);
-
             ul.appendChild(li);
-
-            // Auto-load if previously expanded
-            if (isExpanded) {
-                fetchChildren(file.path, childrenContainer);
-            }
+            if (isExpanded) fetchChildren(file.path, childrenContainer);
         });
-
         containerElement.innerHTML = '';
         containerElement.appendChild(ul);
     } catch (err) { console.error(err); }
@@ -198,86 +193,78 @@ async function fetchChildren(path, containerElement) {
 
 async function toggleDir(arrowElement, path) {
     const container = arrowElement.parentElement.querySelector('div');
-
     if (container.style.display === 'none') {
         await fetchChildren(path, container);
         container.style.display = 'block';
-        arrowElement.innerText = '▼';
+        arrowElement.innerText = '▼ ';
         saveExpandedFolder(path);
     } else {
         container.style.display = 'none';
-        arrowElement.innerText = '▶';
+        arrowElement.innerText = '▶ ';
         removeExpandedFolder(path);
     }
 }
 
-// --- SUGGESTION PANE ---
 async function loadSuggestion(fileName) {
     const pane = document.getElementById('suggestionsPane');
-    pane.innerHTML = `<h2>Getting suggestion for: ${fileName}...</h2>`;
+    const escapedFileName = fileName.replace(/'/g, "\\'");
+
+    pane.innerHTML = `
+        <div class="loading-spinner" style="text-align: center; margin-top: 20px;">
+            <div class="spinner"></div> <p>Analyzing ${fileName}...</p>
+        </div>
+    `;
 
     try {
         const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`);
-
-        if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.details || "Failed to load suggestion");
-        }
+        if (!res.ok) throw new Error('Failed to fetch suggestion');
 
         const data = await res.json();
-        // ... (render the suggestions)
-    } catch (err) {
+
+        // 1. Main suggestion button (no confidence %)
+        let mainSuggestionHtml = `
+            <button onclick="categorizeFile('${escapedFileName}', '${data.path}')" class="btn-suggest">
+                ${data.path}
+            </button>
+        `;
+
+        // 2. Alternates section
+        let alternatesHtml = '';
+        if (data.alternatives && Array.isArray(data.alternatives) && data.alternatives.length > 0) {
+            alternatesHtml = `
+                <div style="margin-top: 15px;">
+                    <p style="font-weight: bold; margin-bottom: 5px;">Alternates:</p>
+                    <div class="actions">
+                        ${data.alternatives.map(alt => `
+                            <button onclick="categorizeFile('${escapedFileName}', '${alt}')" class="btn-alt">
+                                ${alt}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
         pane.innerHTML = `
-            <div class="error-box">
-                <h2>Error</h2>
-                <p>${err.message}</p>
-                <button onclick="loadSuggestion('${fileName}')">Retry</button>
+            <h2>Suggestion for: ${fileName}</h2>
+            ${mainSuggestionHtml}
+            ${alternatesHtml}
+
+            <div class="mt-20" style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="customPath" placeholder="Custom path...">
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="applyCustom('${escapedFileName}')" style="flex-grow: 1;">Apply Path</button>
+                    <button onclick="deleteFile('${escapedFileName}')" class="btn-danger">Delete from Pending</button>
+                </div>
             </div>
         `;
+    } catch (err) {
+        console.error(err);
+        pane.innerHTML = `<p style="color: red;">Error: Could not retrieve AI suggestion.</p>`;
     }
 }
 
 function selectFolder(path) {
     const input = document.getElementById('customPath');
     if (input) input.value = path;
-}
-
-// --- ACTIONS ---
-async function categorizeFile(fileName, fullPath) {
-    const formData = new URLSearchParams();
-    formData.append('fileName', fileName);
-    formData.append('path', fullPath);
-
-    await fetch('/api/v1/documents/categorize', { method: 'POST', body: formData });
-
-    // Refresh both the pending list and the file explorer
-    refreshDashboard();
-    loadExplorer(); // This function should be defined in your scripts.js to re-fetch/re-render the tree
-
-    document.getElementById('suggestionsPane').innerHTML = `<h2>AI Suggestions</h2><p>Select a file to see suggestions.</p>`;
-}
-
-function applyCustom(fileName) {
-    const customPathInput = document.getElementById('customPath');
-    let customPath = customPathInput.value.trim();
-
-    if (customPath) {
-        if (customPath.startsWith('/')) {
-            customPath = customPath.substring(1);
-        }
-        categorizeFile(fileName, customPath);
-    } else {
-        alert("Please enter a valid path.");
-    }
-}
-
-async function deleteFile(fileName) {
-    if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
-
-    await fetch(`/api/v1/documents/delete?fileName=${encodeURIComponent(fileName)}`, {
-        method: 'DELETE'
-    });
-
-    refreshDashboard(); // Update the pending list
-    document.getElementById('suggestionsPane').innerHTML = `<h2>AI Suggestions</h2><p>File removed. Select another file.</p>`;
 }
