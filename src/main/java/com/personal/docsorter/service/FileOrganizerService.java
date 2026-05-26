@@ -31,42 +31,57 @@ public class FileOrganizerService {
         Files.createDirectories(this.targetPath.resolve("PENDING"));
     }
 
-    public void storeInStaging(MultipartFile file) {
+    public void storeInStaging(MultipartFile file, String fullPath) {
         try {
-            String fileName = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
-            // Save directly to the PENDING directory to await categorization
-            Files.copy(file.getInputStream(), this.targetPath.resolve("PENDING").resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+            Path target = this.targetPath.resolve("PENDING").resolve(fullPath);
+            Files.createDirectories(target.getParent()); // This builds the subfolders
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            throw new RuntimeException("Could not store file.", e);
+            throw new RuntimeException("Storage failed", e);
         }
     }
 
-    public List<String> listPendingFiles() {
-        try (var files = Files.list(targetPath.resolve("PENDING"))) {
-            return files.map(p -> p.getFileName().toString()).collect(Collectors.toList());
+    public List<Map<String, Object>> listPendingFiles() {
+        Path pendingDir = targetPath.resolve("PENDING");
+        try (var stream = Files.list(pendingDir)) {
+            return stream.map(p -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("name", p.getFileName().toString());
+                map.put("isDirectory", Files.isDirectory(p));
+                return map;
+            }).collect(Collectors.toList());
         } catch (IOException e) { return Collections.emptyList(); }
     }
 
-    public void moveToFinalFolder(String fileName, String fullPath) throws IOException {
-        // 1. Sanitize the path: remove leading slashes and trim spaces
-        String sanitizedPath = fullPath.trim();
-        if (sanitizedPath.startsWith("/")) {
-            sanitizedPath = sanitizedPath.substring(1);
+    public void moveToFinalFolder(String itemName, String targetFolder) throws IOException {
+        Path source = targetPath.resolve("PENDING").resolve(itemName);
+        Path destinationRoot = targetPath.resolve(targetFolder);
+        Path destination = destinationRoot.resolve(itemName);
+
+        Files.createDirectories(destinationRoot);
+
+        // Check if it's a directory and move recursively if necessary
+        if (Files.isDirectory(source)) {
+            // Use a simple move which handles directory content if the destination
+            // structure is clean.
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
+        } else {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
         }
-
-        // 2. Resolve correctly
-        Path destDir = targetPath.resolve(sanitizedPath);
-
-        // 3. Ensure the directory exists
-        Files.createDirectories(destDir);
-
-        // 4. Move the file
-        Path sourceFile = targetPath.resolve("PENDING").resolve(fileName.trim());
-        Files.move(sourceFile, destDir.resolve(fileName.trim()), StandardCopyOption.REPLACE_EXISTING);
     }
 
     public Map<String, Object> getAiSuggestionForFile(String fileName) throws IOException, TikaException, SAXException {
         Path filePath = targetPath.resolve("PENDING").resolve(fileName.trim());
+
+        // If it's a directory, analyze its children (first file found as a sample)
+        if (Files.isDirectory(filePath)) {
+            // Simple logic: pick the first file in the directory to analyze
+            Optional<Path> firstFile = Files.walk(filePath).filter(Files::isRegularFile).findFirst();
+            if (firstFile.isPresent()) {
+                filePath = firstFile.get();
+            }
+        }
+
         if (!Files.exists(filePath)) return Map.of("options", List.of("UNCATEGORIZED"));
 
         // Extract text content from the file

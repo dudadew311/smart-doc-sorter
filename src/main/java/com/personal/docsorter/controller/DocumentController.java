@@ -22,9 +22,13 @@ public class DocumentController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) {
-        // This now only runs when the user clicks 'Upload All'
-        fileOrganizerService.storeInStaging(file);
+    public ResponseEntity<String> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "fullPath", defaultValue = "") String fullPath) {
+
+        // Fallback to original name if fullPath is empty
+        String path = fullPath.isEmpty() ? file.getOriginalFilename() : fullPath;
+        fileOrganizerService.storeInStaging(file, path);
         return ResponseEntity.ok("SUCCESS");
     }
 
@@ -34,7 +38,7 @@ public class DocumentController {
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<List<String>> getPending() {
+    public ResponseEntity<List<Map<String, Object>>> getPending() {
         return ResponseEntity.ok(fileOrganizerService.listPendingFiles());
     }
 

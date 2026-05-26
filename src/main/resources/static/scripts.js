@@ -16,21 +16,48 @@ document.addEventListener('DOMContentLoaded', () => {
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.style.borderColor = '#cbd5e1';
-        addFilesToStaging(e.dataTransfer.files);
+
+        const items = e.dataTransfer.items;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i].webkitGetAsEntry();
+            if (item) traverseEntry(item);
+        }
     });
 
     uploadAllBtn.addEventListener('click', async () => {
-        for (const file of stagedFiles) {
+        for (const item of stagedFiles) {
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', item.file);
+            formData.append('fullPath', item.fullPath);
             await fetch('/api/v1/documents/upload', { method: 'POST', body: formData });
         }
         resetStaging();
+
+        // Debug: Check if the server actually sees the new files
+        const response = await fetch('/api/v1/documents/pending');
+        const data = await response.json();
+        console.log("Pending files on server:", data);
+
         refreshDashboard();
     });
 
     clearStagedBtn.addEventListener('click', () => resetStaging());
 });
+
+async function traverseEntry(entry, path = "") {
+    if (entry.isFile) {
+        entry.file(file => {
+            const fullPath = path + file.name;
+            stagedFiles.push({ file, fullPath });
+            renderStaging(); // Now this function exists
+        });
+    } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        reader.readEntries(entries => {
+            entries.forEach(e => traverseEntry(e, path + entry.name + "/"));
+        });
+    }
+}
 
 let stagedFiles = [];
 
@@ -52,11 +79,31 @@ function addFilesToStaging(files) {
     }
 }
 
+function renderStaging() {
+    const stagingList = document.getElementById('stagingList');
+    const uploadAllBtn = document.getElementById('uploadAllBtn');
+    const clearStagedBtn = document.getElementById('clearStagedBtn');
+
+    stagingList.innerHTML = '';
+
+    stagedFiles.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.textContent = item.fullPath; // Shows the path/name
+        stagingList.appendChild(li);
+    });
+
+    if (stagedFiles.length > 0) {
+        uploadAllBtn.style.display = 'block';
+        clearStagedBtn.style.display = 'block';
+    } else {
+        uploadAllBtn.style.display = 'none';
+        clearStagedBtn.style.display = 'none';
+    }
+}
+
 function resetStaging() {
     stagedFiles = [];
-    document.getElementById('stagingList').innerHTML = '';
-    document.getElementById('uploadAllBtn').style.display = 'none';
-    document.getElementById('clearStagedBtn').style.display = 'none';
+    renderStaging(); // Clears the list
 }
 
 // --- STATE MANAGEMENT (Persistence) ---
@@ -82,20 +129,23 @@ function removeExpandedFolder(path) {
 async function refreshDashboard() {
     try {
         const res = await fetch('/api/v1/documents/pending');
-        const files = await res.json();
+        const items = await res.json(); // Now receiving {name: "...", isDirectory: boolean}
         const fileList = document.getElementById('fileList');
 
-        fileList.innerHTML = files.map(file => `
-            <div class="pending-item" data-filename="${file}" style="cursor: pointer; padding: 5px; border-bottom: 1px solid #eee;">
-                <span>📄 ${file}</span>
+        fileList.innerHTML = items.map(item => `
+            <div class="pending-item" data-name="${item.name}" style="cursor: pointer; padding: 8px; border-bottom: 1px solid #eee;">
+                <span>${item.isDirectory ? '📁' : '📄'} ${item.name}</span>
             </div>
         `).join('');
 
+        // Attach click listeners to every item
         document.querySelectorAll('.pending-item').forEach(item => {
-            item.addEventListener('click', () => loadSuggestion(item.getAttribute('data-filename')));
+            item.addEventListener('click', () => {
+                const fileName = item.getAttribute('data-name');
+                loadSuggestion(fileName); // This function fetches AI suggestions
+            });
         });
-    } catch (err) { console.error(err); }
-    loadExplorer();
+    } catch (err) { console.error('Error refreshing dashboard:', err); }
 }
 
 // --- EXPLORER PANE ---
@@ -172,6 +222,7 @@ async function loadSuggestion(fileName) {
 
     try {
         const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`);
+        if (!res.ok) throw new Error("Suggestion failed");
         const data = await res.json();
 
         let html = `<h2>Suggestions for ${fileName}</h2>`;
@@ -188,7 +239,7 @@ async function loadSuggestion(fileName) {
         `;
         pane.innerHTML = html;
     } catch (err) {
-        pane.innerHTML = `<h2>Error</h2><p>Could not load suggestions.</p>`;
+        pane.innerHTML = `<h2>Error</h2><p>Could not load suggestions for ${fileName}.</p>`;
     }
 }
 
@@ -204,7 +255,11 @@ async function categorizeFile(fileName, fullPath) {
     formData.append('path', fullPath);
 
     await fetch('/api/v1/documents/categorize', { method: 'POST', body: formData });
+
+    // Refresh both the pending list and the file explorer
     refreshDashboard();
+    loadExplorer(); // This function should be defined in your scripts.js to re-fetch/re-render the tree
+
     document.getElementById('suggestionsPane').innerHTML = `<h2>AI Suggestions</h2><p>Select a file to see suggestions.</p>`;
 }
 
