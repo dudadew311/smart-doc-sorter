@@ -20,14 +20,15 @@ public class AISuggestionServiceTest {
     private RestTemplate restTemplate;
 
     @Test
-    public void testServiceReturnsDefaultOnFailure() {
-        // Force the mock to throw an exception to verify the catch block
+    public void testServiceParsesValidResponseSuccessfully() {
+        // Mock a successful JSON response from Ollama
+        Map<String, Object> mockResponse = Map.of("response", "{\"path\": \"Work/Docs\", \"confidence\": 0.95}");
         when(restTemplate.postForObject(anyString(), any(), eq(Map.class)))
-                .thenThrow(new RuntimeException("Connection Failed"));
+                .thenReturn(mockResponse);
 
-        Map<String, Object> result = aiSuggestionService.getSuggestion(null, "");
+        Map<String, Object> result = aiSuggestionService.getSuggestion("content", "tree");
 
-        assertEquals("UNCATEGORIZED", result.get("path"));
-        assertEquals(0.0, result.get("confidence"));
+        assertEquals("Work/Docs", result.get("path"));
+        assertEquals(0.95, result.get("confidence"));
     }
 }
