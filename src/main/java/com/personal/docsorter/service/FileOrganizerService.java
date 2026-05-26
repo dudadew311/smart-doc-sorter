@@ -70,43 +70,46 @@ public class FileOrganizerService {
         }
     }
 
-    public Map<String, Object> getAiSuggestionForFile(String fileName) throws IOException, TikaException, SAXException {
-        Path filePath = targetPath.resolve("PENDING").resolve(fileName.trim());
+    public Map<String, Object> getAiSuggestionForFile(String itemName) throws IOException, TikaException, SAXException {
+        Path itemPath = targetPath.resolve("PENDING").resolve(itemName);
+        String contentToAnalyze = "";
 
-        // If it's a directory, analyze its children (first file found as a sample)
-        if (Files.isDirectory(filePath)) {
-            // Simple logic: pick the first file in the directory to analyze
-            Optional<Path> firstFile = Files.walk(filePath).filter(Files::isRegularFile).findFirst();
-            if (firstFile.isPresent()) {
-                filePath = firstFile.get();
-            }
+        // Recursive extraction for folders, simple extraction for files
+        if (Files.isDirectory(itemPath)) {
+            contentToAnalyze = Files.walk(itemPath)
+                    .filter(Files::isRegularFile)
+                    .limit(10)
+                    .map(this::extractTextFromPath)
+                    .map(text -> text.length() > 2000 ? text.substring(0, 2000) : text)
+                    .collect(Collectors.joining("\n\n"));
+        } else {
+            contentToAnalyze = extractTextFromPath(itemPath);
         }
 
-        if (!Files.exists(filePath)) return Map.of("options", List.of("UNCATEGORIZED"));
+        // Call the AI. If this fails or returns UNCATEGORIZED, the UI will fallback
+        return aiService.getSuggestion(contentToAnalyze, getFileTreeAsString());
+    }
 
-        // Extract text content from the file
-        BodyContentHandler handler = new BodyContentHandler(-1);
-        AutoDetectParser parser = new AutoDetectParser();
-        try (InputStream is = Files.newInputStream(filePath)) {
+    // Helper method to keep the logic clean
+    private String getFileTreeAsString() {
+        try {
+            // Assuming getFileTree() exists and returns a Map/Object
+            return getFileTree().toString();
+        } catch (IOException e) {
+            return "[]";
+        }
+    }
+
+    // Extractor helper
+    private String extractTextFromPath(Path p) {
+        try (InputStream is = Files.newInputStream(p)) {
+            BodyContentHandler handler = new BodyContentHandler(-1);
+            AutoDetectParser parser = new AutoDetectParser();
             parser.parse(is, handler, new Metadata());
+            return handler.toString();
+        } catch (Exception e) {
+            return "[Could not read file]";
         }
-
-        // Get AI logic result
-        Map<String, Object> aiResult = aiService.getSuggestion(handler.toString(), getFileTree().toString());
-        double confidence = ((Number) aiResult.getOrDefault("confidence", 0.0)).doubleValue();
-
-        // High Confidence Gatekeeper: Auto-move if confidence >= 0.99
-        if (confidence >= 0.99) {
-            moveToFinalFolder(fileName, (String) aiResult.get("path"));
-            return Map.of("options", List.of("Auto-sorted to " + aiResult.get("path")), "autoMoved", true);
-        }
-
-        // Low Confidence: Return primary path + alternatives
-        List<String> options = new ArrayList<>();
-        options.add((String) aiResult.get("path"));
-        options.addAll((List<String>) aiResult.getOrDefault("alternatives", new ArrayList<>()));
-
-        return Map.of("options", options, "autoMoved", false);
     }
 
     public Map<String, Object> getFileTree() throws IOException {

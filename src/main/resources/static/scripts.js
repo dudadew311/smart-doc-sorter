@@ -212,32 +212,43 @@ async function toggleDir(arrowElement, path) {
 // --- SUGGESTION PANE ---
 async function loadSuggestion(fileName) {
     const pane = document.getElementById('suggestionsPane');
+
+    // 1. Move the hourglass BELOW the text
     pane.innerHTML = `
-        <h2>Suggestions for ${fileName}</h2>
-        <div style="display: flex; align-items: center; padding: 20px;">
-            <div class="hourglass"></div>
-            <p>AI is thinking...</p>
+        <div class="loading-state" style="text-align: center;">
+            <h2>Getting suggestion for: ${fileName}...</h2>
+            <div class="hourglass" style="font-size: 2rem; margin-top: 10px;">⏳</div>
         </div>
     `;
 
     try {
         const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`);
-        if (!res.ok) throw new Error("Suggestion failed");
         const data = await res.json();
 
+        // 2. Removed the confidence percentage line
         let html = `<h2>Suggestions for ${fileName}</h2>`;
-        data.options.forEach(path => {
-            html += `<button onclick="categorizeFile('${fileName}', '${path}')">${path}</button>`;
-        });
 
+        // Render Primary Recommendation
+        html += `<button onclick="categorizeFile('${fileName}', '${data.path}')">Move to: ${data.path}</button>`;
+
+        // Render Alternatives
+        if (data.alternatives && data.alternatives.length > 0) {
+            html += `<h3>Alternatives:</h3>`;
+            data.alternatives.forEach(alt => {
+                html += `<button class="alt-btn" onclick="categorizeFile('${fileName}', '${alt}')">${alt}</button>`;
+            });
+        }
+
+        // Custom path fallback
         html += `
             <div style="margin-top: 20px;">
-                <h3>Or enter custom path:</h3>
-                <input type="text" id="customPath" placeholder="e.g., Projects/2026/Work">
-                <button onclick="applyCustom('${fileName}')" style="padding: 12px; font-size: 1rem;">Apply Custom Path</button>
+                <h3>Custom Destination:</h3>
+                <input type="text" id="customPath" placeholder="e.g., Archive/2026">
+                <button onclick="applyCustom('${fileName}')">Apply Custom Path</button>
             </div>
         `;
         pane.innerHTML = html;
+
     } catch (err) {
         pane.innerHTML = `<h2>Error</h2><p>Could not load suggestions for ${fileName}.</p>`;
     }
