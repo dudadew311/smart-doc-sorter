@@ -60,11 +60,14 @@ public class DocumentController {
         return ResponseEntity.ok(fileOrganizerService.getChildren(path));
     }
 
-
-    // Explicitly using Map<String, Object> to ensure compatibility with
-    // the List return from the service
     @GetMapping("/suggestions")
     public ResponseEntity<Map<String, Object>> getSuggestions(@RequestParam String fileName) throws IOException, TikaException, SAXException {
         return ResponseEntity.ok(fileOrganizerService.getAiSuggestionForFile(fileName));
+    }
+
+    @DeleteMapping("/delete")
+    public ResponseEntity<String> deleteFile(@RequestParam String fileName) throws IOException {
+        fileOrganizerService.deletePendingFile(fileName);
+        return ResponseEntity.ok("SUCCESS");
     }
 }

@@ -151,4 +151,20 @@ public class FileOrganizerService {
                     .collect(Collectors.toList());
         }
     }
+
+    public void deletePendingFile(String fileName) throws IOException {
+        Path fileToDelete = targetPath.resolve("PENDING").resolve(fileName);
+
+        if (Files.exists(fileToDelete)) {
+            if (Files.isDirectory(fileToDelete)) {
+                // Delete folder and all contents recursively
+                Files.walk(fileToDelete)
+                        .sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(java.io.File::delete);
+            } else {
+                Files.delete(fileToDelete);
+            }
+        }
+    }
 }
