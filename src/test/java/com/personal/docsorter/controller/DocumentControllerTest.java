@@ -27,12 +27,18 @@ public class DocumentControllerTest {
 
     @Test
     public void testGetPendingFiles() throws Exception {
-        when(fileOrganizerService.listPendingFiles()).thenReturn(List.of("doc1.pdf", "doc2.txt"));
+        // Return a list of maps, not a list of strings
+        List<Map<String, Object>> mockPending = List.of(
+                Map.of("name", "doc1.pdf"),
+                Map.of("name", "doc2.txt")
+        );
+
+        when(fileOrganizerService.listPendingFiles()).thenReturn(mockPending);
 
         mockMvc.perform(get("/api/v1/documents/pending"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value("doc1.pdf"))
-                .andExpect(jsonPath("$[1]").value("doc2.txt"));
+                .andExpect(jsonPath("$[0].name").value("doc1.pdf"))
+                .andExpect(jsonPath("$[1].name").value("doc2.txt"));
     }
 
     @Test
