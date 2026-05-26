@@ -1,19 +1,19 @@
 package com.personal.docsorter.service;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.util.Comparator;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.when;
 
@@ -23,56 +23,65 @@ public class FileOrganizerServiceTest {
     @Mock
     private AISuggestionService aiService;
     private FileOrganizerService fileOrganizerService;
+    private final String STAGING = "target/test-staging";
+    private final String STORAGE = "target/test-storage";
 
     @BeforeEach
     void setUp() throws IOException {
-        // Manually initialize with dummy paths to avoid null @Value injection issues
-        fileOrganizerService = new FileOrganizerService("target/test-staging", "target/test-storage", aiService);
+        fileOrganizerService = new FileOrganizerService(STAGING, STORAGE, aiService);
     }
 
-//    @Test
-//    public void testHighConfidenceAutoSortsFile() throws Exception {
-//        // 1. Create a dummy file so Files.exists(filePath) returns true
-//        Path pendingDir = Paths.get("target/test-storage/PENDING");
-//        Files.createDirectories(pendingDir);
-//        Files.writeString(pendingDir.resolve("test-file.pdf"), "dummy content");
-//
-//        when(aiService.getSuggestion(anyString(), anyString()))
-//                .thenReturn(Map.of("path", "Work/Docs", "confidence", 0.99));
-//
-//        var result = fileOrganizerService.getAiSuggestionForFile("test-file.pdf");
-//
-//        // 2. Use getOrDefault to prevent NullPointerException
-//        assertTrue((Boolean) result.getOrDefault("autoMoved", false));
-//    }
-//
-//    @Test
-//    public void testLowConfidenceLeavesFileInPending() throws Exception {
-//        // 1. Create a dummy file
-//        Path pendingDir = Paths.get("target/test-storage/PENDING");
-//        Files.createDirectories(pendingDir);
-//        Files.writeString(pendingDir.resolve("test-file.pdf"), "dummy content");
-//
-//        when(aiService.getSuggestion(anyString(), anyString()))
-//                .thenReturn(Map.of("path", "Misc", "confidence", 0.50));
-//
-//        var result = fileOrganizerService.getAiSuggestionForFile("test-file.pdf");
-//
-//        // 2. Use getOrDefault
-//        assertFalse((Boolean) result.getOrDefault("autoMoved", true)); // Check it explicitly returns false
-//    }
+    @AfterEach
+    void tearDown() throws IOException {
+        // Cleanup created directories
+        Path storagePath = Paths.get(STORAGE);
+        if (Files.exists(storagePath)) {
+            Files.walk(storagePath)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(java.io.File::delete);
+        }
+    }
 
     @Test
     public void testFileTreeExcludesPendingDirectory() throws IOException {
-        // Ensure PENDING exists
-        Path pending = Paths.get("target/test-storage/PENDING");
+        Path pending = Paths.get(STORAGE, "PENDING");
         Files.createDirectories(pending);
-
         Map<String, Object> tree = fileOrganizerService.getFileTree();
+        assertFalse(tree.toString().contains("PENDING"), "Tree should not contain PENDING directory");
+    }
 
-        // Check if the tree structure contains "PENDING"
-        // This validates the logic: .filter(p -> !p.getFileName().toString().equals("PENDING"))
-        String treeJson = tree.toString();
-        assertFalse(treeJson.contains("PENDING"), "Tree should not contain PENDING directory");
+    @Test
+    public void testListPendingFiles() throws IOException {
+        Path pending = Paths.get(STORAGE, "PENDING");
+        Files.createDirectories(pending);
+        Files.writeString(pending.resolve("test.txt"), "hello");
+
+        var files = fileOrganizerService.listPendingFiles();
+        assertEquals(1, files.size());
+        assertEquals("test.txt", files.get(0).get("name"));
+    }
+
+    @Test
+    public void testDeletePendingFile() throws IOException {
+        Path pending = Paths.get(STORAGE, "PENDING");
+        Files.createDirectories(pending);
+        Path file = pending.resolve("delete-me.txt");
+        Files.writeString(file, "content");
+
+        fileOrganizerService.deletePendingFile("delete-me.txt");
+        assertFalse(Files.exists(file));
+    }
+
+    @Test
+    public void testMoveToFinalFolder() throws IOException {
+        Path pending = Paths.get(STORAGE, "PENDING");
+        Files.createDirectories(pending);
+        Files.writeString(pending.resolve("move-me.txt"), "content");
+
+        fileOrganizerService.moveToFinalFolder("move-me.txt", "Archive");
+
+        assertTrue(Files.exists(Paths.get(STORAGE, "Archive", "move-me.txt")));
+        assertFalse(Files.exists(pending.resolve("move-me.txt")));
     }
 }
