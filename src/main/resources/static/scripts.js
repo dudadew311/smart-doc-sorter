@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item) traverseEntry(item);
         }
     });
+    document.getElementById('collapseAllBtn').addEventListener('click', () => {
+            localStorage.removeItem('expandedFolders'); // Clear state
+            loadExplorer(); // Re-render tree
+        });
 
     uploadAllBtn.addEventListener('click', async () => {
         for (const item of stagedFiles) {
@@ -62,21 +66,11 @@ async function traverseEntry(entry, path = "") {
 let stagedFiles = [];
 
 function addFilesToStaging(files) {
-    const stagingList = document.getElementById('stagingList');
-    const uploadAllBtn = document.getElementById('uploadAllBtn');
-    const clearStagedBtn = document.getElementById('clearStagedBtn');
-
     Array.from(files).forEach(file => {
-        stagedFiles.push(file);
-        const li = document.createElement('li');
-        li.textContent = file.name;
-        stagingList.appendChild(li);
+        // Use consistent object structure
+        stagedFiles.push({ file: file, fullPath: file.name });
     });
-
-    if (stagedFiles.length > 0) {
-        uploadAllBtn.style.display = 'block';
-        clearStagedBtn.style.display = 'block';
-    }
+    renderStaging(); // Centralized rendering
 }
 
 function renderStaging() {
@@ -86,18 +80,19 @@ function renderStaging() {
 
     stagingList.innerHTML = '';
 
-    stagedFiles.forEach((item, index) => {
+    stagedFiles.forEach((item) => {
         const li = document.createElement('li');
-        li.textContent = item.fullPath; // Shows the path/name
+        li.textContent = item.fullPath;
         stagingList.appendChild(li);
     });
 
+    // Use classList for visibility consistency
     if (stagedFiles.length > 0) {
-        uploadAllBtn.style.display = 'block';
-        clearStagedBtn.style.display = 'block';
+        uploadAllBtn.classList.remove('hidden');
+        clearStagedBtn.classList.remove('hidden');
     } else {
-        uploadAllBtn.style.display = 'none';
-        clearStagedBtn.style.display = 'none';
+        uploadAllBtn.classList.add('hidden');
+        clearStagedBtn.classList.add('hidden');
     }
 }
 
@@ -150,10 +145,10 @@ async function refreshDashboard() {
 
 // --- EXPLORER PANE ---
 async function loadExplorer() {
-    const explorerPane = document.getElementById('explorerPane');
-    explorerPane.innerHTML = '<h2>File Explorer</h2>';
+    const content = document.getElementById('explorerContent');
+    content.innerHTML = ''; // Clear existing
     const rootContainer = document.createElement('div');
-    explorerPane.appendChild(rootContainer);
+    content.appendChild(rootContainer);
     await fetchChildren('/', rootContainer);
 }
 
@@ -215,11 +210,11 @@ async function loadSuggestion(fileName) {
 
     // 1. Move the hourglass BELOW the text
     pane.innerHTML = `
-        <div class="loading-state" style="text-align: center;">
-            <h2>Getting suggestion for: ${fileName}...</h2>
-            <div class="hourglass" style="font-size: 2rem; margin-top: 10px;">⏳</div>
-        </div>
-    `;
+            <div class="loading-state" style="text-align: center;">
+                <h2>Getting suggestion for: ${fileName}...</h2>
+                <div class="spinner"></div>
+            </div>
+        `;
 
     try {
         const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`);
@@ -244,7 +239,11 @@ async function loadSuggestion(fileName) {
             <div style="margin-top: 20px;">
                 <h3>Custom Destination:</h3>
                 <input type="text" id="customPath" placeholder="e.g., Archive/2026">
-                <button onclick="applyCustom('${fileName}')">Apply Custom Path</button>
+
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="applyCustom('${fileName}')" style="flex: 2;">Apply Path</button>
+                    <button onclick="deleteFile('${fileName}')" style="flex: 1; background-color: #ef4444;">Delete From Pending</button>
+                </div>
             </div>
         `;
         pane.innerHTML = html;
@@ -286,4 +285,15 @@ function applyCustom(fileName) {
     } else {
         alert("Please enter a valid path.");
     }
+}
+
+async function deleteFile(fileName) {
+    if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
+
+    await fetch(`/api/v1/documents/delete?fileName=${encodeURIComponent(fileName)}`, {
+        method: 'DELETE'
+    });
+
+    refreshDashboard(); // Update the pending list
+    document.getElementById('suggestionsPane').innerHTML = `<h2>AI Suggestions</h2><p>File removed. Select another file.</p>`;
 }

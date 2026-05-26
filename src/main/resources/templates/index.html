@@ -14,21 +14,23 @@
     <div id="pendingPane" class="pane">
         <h2>Pending Files</h2>
 
-        <div id="dropZone" class="box" style="border: 2px dashed #cbd5e1; padding: 20px; text-align: center; cursor: pointer;">
+        <div id="dropZone" class="box">
             <p>Drag & Drop here or click to upload</p>
-            <input type="file" id="fileInput" multiple style="display:none;" />
-        </div>
+            <input type="file" id="fileInput" multiple class="hidden-input" />
 
-        <div id="stagingArea" style="margin-top: 20px;">
-            <h3>Staged for Upload</h3>
-            <ul id="stagingList"></ul>
-            <div style="display:flex; gap: 10px;">
-                <button id="uploadAllBtn" style="display:none;">Upload All Staged Files</button>
-                <button id="clearStagedBtn" style="display:none; background-color: #ef4444; color: white;">Clear Staged Files</button>
+            <div id="stagingArea">
+                <ul id="stagingList"></ul>
             </div>
         </div>
 
-        <div id="fileList"></div>
+        <div class="staging-controls mt-20">
+            <button id="uploadAllBtn" class="hidden">Upload All Staged Files</button>
+            <button id="clearStagedBtn" class="btn-danger hidden">Clear Staged Files</button>
+        </div>
+
+        <div class="scrollable-content">
+            <div id="fileList"></div>
+        </div>
     </div>
 
     <div id="suggestionsPane" class="pane">
@@ -37,7 +39,11 @@
     </div>
 
     <div id="explorerPane" class="pane">
-        <h2>File Explorer</h2>
+        <div id="explorerHeader" class="header-flex">
+            <h2>File Explorer</h2>
+            <button id="collapseAllBtn" class="auto-width">Collapse All</button>
+        </div>
+        <div id="explorerContent"></div>
     </div>
 </div>
 <script src="scripts.js"></script>
