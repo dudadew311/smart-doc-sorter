@@ -9,7 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearStagedBtn = document.getElementById('clearStagedBtn');
 
     dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => addFilesToStaging(e.target.files));
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            addFilesToStaging(e.target.files);
+            fileInput.value = '';
+        }
+    });
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; });
     dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#cbd5e1'; });
@@ -66,11 +71,13 @@ async function traverseEntry(entry, path = "") {
 let stagedFiles = [];
 
 function addFilesToStaging(files) {
+    // Ensure we are iterating correctly
     Array.from(files).forEach(file => {
-        // Use consistent object structure
+        // Double check: is file.name valid?
         stagedFiles.push({ file: file, fullPath: file.name });
     });
-    renderStaging(); // Centralized rendering
+    // This calls the rendering logic that shows your buttons
+    renderStaging();
 }
 
 function renderStaging() {
