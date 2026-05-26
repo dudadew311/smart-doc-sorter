@@ -17,6 +17,7 @@ public class AISuggestionService {
 
     public Map<String, Object> getSuggestion(String fileContent, String currentTree) {
         try {
+            // Updated prompt to explicitly request the alternatives array
             String prompt = "You are a professional filing assistant. Current structure: " + currentTree +
                     ". Analyze the content and suggest a folder path. " +
                     "Return ONLY a JSON object: {\"path\": \"Folder/Sub\", \"confidence\": 0.95, \"alternatives\": [\"Alt1\", \"Alt2\"]}. " +
@@ -28,9 +29,14 @@ public class AISuggestionService {
 
             int start = aiString.indexOf("{");
             int end = aiString.lastIndexOf("}");
-            return objectMapper.readValue(aiString.substring(start, end + 1), Map.class);
+            Map<String, Object> result = objectMapper.readValue(aiString.substring(start, end + 1), Map.class);
+            if (!result.containsKey("alternatives")) {
+                result.put("alternatives", new ArrayList<>());
+            }
+            return result;
         } catch (Exception e) {
-            return Map.of("path", "UNCATEGORIZED", "confidence", 0.0, "alternatives", List.of());
+            // Return this if AI fails
+            return Map.of("path", "UNCATEGORIZED", "confidence", 0.0, "alternatives", new ArrayList<>());
         }
     }
 }
