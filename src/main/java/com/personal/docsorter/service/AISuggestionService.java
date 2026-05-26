@@ -37,8 +37,7 @@ public class AISuggestionService {
             Map<String, Object> result = objectMapper.readValue(aiString.substring(start, end + 1), Map.class);
             return result;
         } catch (Exception e) {
-            // Log the error here in a real application!
-            return Map.of("path", "UNCATEGORIZED", "confidence", 0.0, "alternatives", new ArrayList<>());
+            throw new RuntimeException("AI Service is currently unreachable. Please try again later.");
         }
     }
 }

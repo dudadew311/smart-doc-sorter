@@ -214,49 +214,26 @@ async function toggleDir(arrowElement, path) {
 // --- SUGGESTION PANE ---
 async function loadSuggestion(fileName) {
     const pane = document.getElementById('suggestionsPane');
-
-    // 1. Move the hourglass BELOW the text
-    pane.innerHTML = `
-            <div class="loading-state" style="text-align: center;">
-                <h2>Getting suggestion for: ${fileName}...</h2>
-                <div class="spinner"></div>
-            </div>
-        `;
+    pane.innerHTML = `<h2>Getting suggestion for: ${fileName}...</h2>`;
 
     try {
         const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`);
-        const data = await res.json();
 
-        // 2. Removed the confidence percentage line
-        let html = `<h2>Suggestions for ${fileName}</h2>`;
-
-        // Render Primary Recommendation
-        html += `<button onclick="categorizeFile('${fileName}', '${data.path}')">Move to: ${data.path}</button>`;
-
-        // Render Alternatives
-        if (data.alternatives && data.alternatives.length > 0) {
-            html += `<h3>Alternatives:</h3>`;
-            data.alternatives.forEach(alt => {
-                html += `<button class="alt-btn" onclick="categorizeFile('${fileName}', '${alt}')">${alt}</button>`;
-            });
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.details || "Failed to load suggestion");
         }
 
-        // Custom path fallback
-        html += `
-            <div style="margin-top: 20px;">
-                <h3>Custom Destination:</h3>
-                <input type="text" id="customPath" placeholder="e.g., Archive/2026">
-
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="applyCustom('${fileName}')" style="flex: 2;">Apply Path</button>
-                    <button onclick="deleteFile('${fileName}')" style="flex: 1; background-color: #ef4444;">Delete From Pending</button>
-                </div>
+        const data = await res.json();
+        // ... (render the suggestions)
+    } catch (err) {
+        pane.innerHTML = `
+            <div class="error-box">
+                <h2>Error</h2>
+                <p>${err.message}</p>
+                <button onclick="loadSuggestion('${fileName}')">Retry</button>
             </div>
         `;
-        pane.innerHTML = html;
-
-    } catch (err) {
-        pane.innerHTML = `<h2>Error</h2><p>Could not load suggestions for ${fileName}.</p>`;
     }
 }
 

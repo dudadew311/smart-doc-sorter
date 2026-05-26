@@ -8,8 +8,8 @@ SmartFile Sorter is an AI-powered document organization assistant designed to st
 * **AI Analysis**: The system extracts text content and uses a local Ollama-hosted LLM to suggest categorization paths.
 
 ## The Gatekeeper
-* **High Confidence (>= 0.99)**: The file is automatically moved to the target folder.
-* **Low Confidence**: The file remains in `PENDING` until you select a path from the provided AI suggestions or define a custom path.
+* **AI Suggestions**: The system analyzes the file and provides a recommended path.
+* **Manual Oversight**: You can either accept the suggested path or define a custom path if preferred.
 
 ## Tech Stack
 * **Backend**: Spring Boot (Java 17+)
