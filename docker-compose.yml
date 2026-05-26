@@ -10,8 +10,8 @@ services:
       - OLLAMA_URL=http://ollama:11434/api/generate
       - AI_MODEL_NAME=tinyllama
     volumes:
-      - /Volume2/homes/${USER_DIR}/docker/smart-doc-sorter/staging:/app/storage/staging
-      - /Volume2/homes/${USER_DIR}:/app/storage/target
+      - /Volume2/homes/Feerny/docker/smart-doc-sorter/staging:/app/storage/staging
+      - /Volume2/homes/Feerny:/app/storage/target
     user: "0:0"
     restart: unless-stopped
     depends_on:
