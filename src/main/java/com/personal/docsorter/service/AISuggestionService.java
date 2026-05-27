@@ -1,6 +1,7 @@
 package com.personal.docsorter.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value; // Add this import
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import java.util.*;
@@ -9,7 +10,12 @@ import java.util.*;
 public class AISuggestionService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String OLLAMA_URL = "http://localhost:11434/api/generate";
+
+    @Value("${OLLAMA_URL:http://localhost:11434/api/generate}")
+    private String ollamaUrl;
+
+    @Value("${AI_MODEL_NAME:llama3}")
+    private String modelName;
 
     public AISuggestionService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
@@ -22,14 +28,14 @@ public class AISuggestionService {
                     "Return ONLY a JSON object: {\"path\": \"Folder/Sub\", \"confidence\": 0.95, \"alternatives\": [\"Alt1\", \"Alt2\"]}. " +
                     "Content: " + fileContent;
 
-            Map<String, Object> request = Map.of("model", "llama3", "prompt", prompt, "stream", false);
-            Map response = restTemplate.postForObject(OLLAMA_URL, request, Map.class);
+            // Use dynamic fields here
+            Map<String, Object> request = Map.of("model", modelName, "prompt", prompt, "stream", false);
+            Map response = restTemplate.postForObject(ollamaUrl, request, Map.class);
             String aiString = (String) response.get("response");
 
             int start = aiString.indexOf("{");
             int end = aiString.lastIndexOf("}");
 
-            // Defensive check
             if (start == -1 || end == -1 || start >= end) {
                 throw new RuntimeException("AI response did not contain valid JSON");
             }

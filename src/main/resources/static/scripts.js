@@ -209,26 +209,47 @@ async function loadSuggestion(fileName) {
     const pane = document.getElementById('suggestionsPane');
     const escapedFileName = fileName.replace(/'/g, "\\'");
 
+    // 1. Render the UI container shell immediately so the delete button is instantly persistent
     pane.innerHTML = `
-        <div class="loading-spinner" style="text-align: center; margin-top: 20px;">
-            <div class="spinner"></div> <p>Analyzing ${fileName}...</p>
+        <h2>AI Suggestion for: ${fileName}</h2>
+        <div id="aiStatusArea">
+            <div class="loading-spinner" style="text-align: center; margin-top: 20px;">
+                <div class="spinner"></div> <p>Analyzing content with TinyLlama...</p>
+            </div>
+        </div>
+
+        <div class="mt-20" style="display: flex; flex-direction: column; gap: 10px;">
+            <input type="text" id="customPath" placeholder="Custom path...">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="applyCustom('${escapedFileName}')" style="flex-grow: 1;">Apply Path</button>
+                <button id="activeDeleteBtn" class="btn-danger">Delete from Pending</button>
+            </div>
         </div>
     `;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second window
+
+    // Bind the delete function immediately to the button, hooking into the active abort controller
+    document.getElementById('activeDeleteBtn').onclick = () => deleteFile(escapedFileName, controller, timeoutId);
+
     try {
-        const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`);
+        const res = await fetch(`/api/v1/documents/suggestions?fileName=${encodeURIComponent(fileName)}`, {
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
         if (!res.ok) throw new Error('Failed to fetch suggestion');
 
         const data = await res.json();
 
-        // 1. Main suggestion button (no confidence %)
         let mainSuggestionHtml = `
             <button onclick="categorizeFile('${escapedFileName}', '${data.path}')" class="btn-suggest">
                 ${data.path}
             </button>
         `;
 
-        // 2. Alternates section
         let alternatesHtml = '';
         if (data.alternatives && Array.isArray(data.alternatives) && data.alternatives.length > 0) {
             alternatesHtml = `
@@ -245,26 +266,104 @@ async function loadSuggestion(fileName) {
             `;
         }
 
-        pane.innerHTML = `
-            <h2>Suggestion for: ${fileName}</h2>
-            ${mainSuggestionHtml}
-            ${alternatesHtml}
-
-            <div class="mt-20" style="display: flex; flex-direction: column; gap: 10px;">
-                <input type="text" id="customPath" placeholder="Custom path...">
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="applyCustom('${escapedFileName}')" style="flex-grow: 1;">Apply Path</button>
-                    <button onclick="deleteFile('${escapedFileName}')" class="btn-danger">Delete from Pending</button>
-                </div>
-            </div>
-        `;
+        // 2. Only overwrite the status area to preserve input fields and bindings if the user hasn't clicked delete
+        const statusArea = document.getElementById('aiStatusArea');
+        if (statusArea) {
+            statusArea.innerHTML = `
+                ${mainSuggestionHtml}
+                ${alternatesHtml}
+            `;
+        }
     } catch (err) {
+        clearTimeout(timeoutId);
         console.error(err);
-        pane.innerHTML = `<p style="color: red;">Error: Could not retrieve AI suggestion.</p>`;
+
+        const statusArea = document.getElementById('aiStatusArea');
+        if (!statusArea) return; // Means item was deleted and UI reset completely
+
+        if (err.name === 'AbortError') {
+            statusArea.innerHTML = `
+                <p style="color: #eab308; font-weight: bold; margin-bottom: 5px;">
+                    ⚠️ TinyLlama took too long to respond (exceeded 30s).
+                </p>
+                <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
+                    Please select a target destination folder using the file explorer or enter a custom path manually below:
+                </p>
+            `;
+        } else {
+            statusArea.innerHTML = `
+                <p style="color: var(--danger);">Error: Could not retrieve AI suggestion from the service.</p>
+            `;
+        }
     }
 }
 
 function selectFolder(path) {
     const input = document.getElementById('customPath');
-    if (input) input.value = path;
+    if (input) {
+        // Strip out the leading slash if it exists so the backend resolves it relatively
+        const cleanedPath = path.startsWith('/') ? path.substring(1) : path;
+        input.value = cleanedPath;
+    }
+}
+
+// --- CORE UTILITY ACTIONS ---
+
+async function categorizeFile(fileName, targetPath) {
+    if (!targetPath || targetPath.trim() === "") {
+        alert("Please select or enter a path first.");
+        return;
+    }
+    try {
+        const res = await fetch(`/api/v1/documents/categorize?fileName=${encodeURIComponent(fileName)}&path=${encodeURIComponent(targetPath)}`, {
+            method: 'POST'
+        });
+        if (res.ok) {
+            document.getElementById('suggestionsPane').innerHTML = `
+                <h2>AI Suggestions</h2>
+                <p style="color: #10b981; font-weight: bold;">✓ File successfully organized!</p>
+            `;
+            refreshDashboard();
+            loadExplorer();
+        } else {
+            alert("Failed to organize file.");
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function applyCustom(fileName) {
+    const input = document.getElementById('customPath');
+    if (input) {
+        categorizeFile(fileName, input.value);
+    }
+}
+
+async function deleteFile(fileName, activeController = null, timeoutId = null) {
+    if (!confirm(`Are you sure you want to delete "${fileName}" from pending storage?`)) return;
+
+    // If the AI is actively running, abort its fetch promise connection immediately
+    if (activeController) {
+        console.log("Interrupting running AI request for deletion...");
+        if (timeoutId) clearTimeout(timeoutId);
+        activeController.abort();
+    }
+
+    try {
+        const res = await fetch(`/api/v1/documents/delete?fileName=${encodeURIComponent(fileName)}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            document.getElementById('suggestionsPane').innerHTML = `
+                <h2>AI Suggestions</h2>
+                <p style="color: #cbd5e1;">File deleted.</p>
+            `;
+            refreshDashboard();
+        } else {
+            alert("Failed to delete the file.");
+        }
+    } catch (err) {
+        console.error(err);
+    }
 }
