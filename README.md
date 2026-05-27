@@ -56,3 +56,27 @@ Drag and drop documents into the **Pending Files** drop zone. When ready, click 
 
 ### Deploying to TNAS (TOS 6.0)
 Use the provided docker-compose.yml in your Docker Manager on your TerraMaster NAS. Ensure your data volumes are mapped to your existing file system to maintain persistent storage.
+
+### Updating the Application on TNAS
+
+When you make changes to the frontend interface (`scripts.js`, `index.html`) or backend source code, follow these steps via SSH on your TerraMaster NAS to build and deploy the updates:
+
+1. **Navigate to the Project Directory:**
+   ```bash
+   cd /Volume2/homes/Feerny/docker/smart-doc-sorter
+   ```
+
+2. **Stop the Running Containers:** Bring down the active stack to clear memory hooks:
+   ```bash
+   docker-compose down
+   ```
+   
+3. **Rebuild the Application Container:** Force a clean rebuild of the container layers without using old cached steps to ensure all modifications are baked into the new image:
+   ```bash
+   docker-compose build --no-cache
+   ```
+
+4. **Launch the Updated Stack:** Start the services back up in detached mode:
+   ```bash
+   docker-compose up -d
+   ```
