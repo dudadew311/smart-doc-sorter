@@ -13,7 +13,7 @@ SmartFile Sorter is an AI-powered document organization assistant designed to st
 
 ## Tech Stack
 * **Backend**: Spring Boot (Java 17+)
-* **AI Engine**: Ollama (Llama 3)
+* **AI Engine**: Groq API (Llama 3)
 * **Content Extraction**: Apache Tika
 * **Frontend**: Native HTML/JS (No frameworks, high-speed responsiveness)
 * **Containerization**: Docker / Docker Compose
@@ -23,7 +23,7 @@ SmartFile Sorter is an AI-powered document organization assistant designed to st
 ### Prerequisites
 * Java 17 or higher
 * Docker & Docker Compose
-* Ollama installed and running locally
+* A valid Groq API Key
 
 ### Installation
 1. **Clone the repository**:

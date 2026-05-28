@@ -38,7 +38,7 @@ public class AISuggestionService {
                 cleanHierarchy = cleanHierarchy.substring(0, 10000);
             }
 
-            System.out.println("DEBUG: Hierarchy being sent to AI (Tree Format): \n" + cleanHierarchy);
+//            System.out.println("DEBUG: Hierarchy being sent to AI (Tree Format): \n" + cleanHierarchy);
             String systemPrompt = "You are a filing assistant. " +
                     "Analyze the path structure to determine the most logical folder for the content. " +
                     "You MUST return a JSON object with two fields: 'path' (string) and 'alternatives' (a list of 3 strings). " +
@@ -62,13 +62,13 @@ public class AISuggestionService {
 
             Map<String, Object> response = restTemplate.postForObject(groqUrl, entity, Map.class);
 
-            System.out.println("DEBUG: Raw Groq Response Map: " + response);
+//            System.out.println("DEBUG: Raw Groq Response Map: " + response);
             // Extract the JSON content from the Groq response
             List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
             Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
             String content = (String) message.get("content");
 
-            System.out.println("DEBUG: AI Content String: " + content);
+//            System.out.println("DEBUG: AI Content String: " + content);
             // Parse the string 'content' into your return Map
             return objectMapper.readValue(content, Map.class);
             // ----------------------
