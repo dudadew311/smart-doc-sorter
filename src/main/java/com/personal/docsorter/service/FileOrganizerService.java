@@ -1,6 +1,5 @@
 package com.personal.docsorter.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -94,10 +93,8 @@ public class FileOrganizerService {
     // Helper method to keep the logic clean
     private String getFileTreeAsString() {
         try {
-            // Use the ObjectMapper to convert the map to a JSON string instead of .toString()
-            // AISuggestionService can then use objectMapper.readTree(jsonString) safely.
-            ObjectMapper mapper = new ObjectMapper();
-            return mapper.writeValueAsString(getFileTree());
+            // Assuming getFileTree() exists and returns a Map/Object
+            return getFileTree().toString();
         } catch (IOException e) {
             return "[]";
         }
