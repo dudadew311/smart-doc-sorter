@@ -214,7 +214,7 @@ async function loadSuggestion(fileName) {
         <h2>AI Suggestion for: ${fileName}</h2>
         <div id="aiStatusArea">
             <div class="loading-spinner" style="text-align: center; margin-top: 20px;">
-                <div class="spinner"></div> <p>Analyzing content with TinyLlama...</p>
+                <div class="spinner"></div> <p>Analyzing content with Groq...</p>
             </div>
         </div>
 
@@ -228,7 +228,7 @@ async function loadSuggestion(fileName) {
     `;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second window
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 30-second window
 
     // Bind the delete function immediately to the button, hooking into the active abort controller
     document.getElementById('activeDeleteBtn').onclick = () => deleteFile(escapedFileName, controller, timeoutId);
@@ -284,7 +284,7 @@ async function loadSuggestion(fileName) {
         if (err.name === 'AbortError') {
             statusArea.innerHTML = `
                 <p style="color: #eab308; font-weight: bold; margin-bottom: 5px;">
-                    ⚠️ TinyLlama took too long to respond (exceeded 30s).
+                    ⚠️ Groq took too long to respond (exceeded 2 minutes).
                 </p>
                 <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
                     Please select a target destination folder using the file explorer or enter a custom path manually below:
