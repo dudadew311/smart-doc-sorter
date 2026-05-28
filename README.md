@@ -1,6 +1,9 @@
 # SmartFile Sorter
 
 SmartFile Sorter is an AI-powered document organization assistant designed to streamline your digital workspace. By leveraging local LLMs, it automatically categorizes your files based on their content, moving them to your desired directory structure while allowing for manual oversight on ambiguous files.
+<div align="center">
+  <img src="./Screenshot/Picture of UI.png" width="500">
+</div>
 
 ## Core Workflow
 * **Staging**: Drop files into the dashboard’s staging area; files remain in your browser until you choose to upload.
